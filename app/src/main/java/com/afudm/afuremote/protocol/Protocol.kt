@@ -38,6 +38,12 @@ data class OpenRequest(val url: String, val title: String = "", val forceMedia: 
 data class KeyRequest(val key: String)
 
 @Serializable
+data class LaunchRequest(val pkg: String)
+
+@Serializable
+data class TextRequest(val text: String)
+
+@Serializable
 data class ApiResult(val ok: Boolean, val hata: String = "", val saat: Long = 0)
 
 enum class RemoteKey(val wire: String) {
@@ -48,7 +54,13 @@ enum class RemoteKey(val wire: String) {
     MUTE("mute"),
     PLAY_PAUSE("play_pause"),
     SEEK_FWD("seek_fwd"),
-    SEEK_BACK("seek_back");
+    SEEK_BACK("seek_back"),
+    DPAD_UP("up"),
+    DPAD_DOWN("down"),
+    DPAD_LEFT("left"),
+    DPAD_RIGHT("right"),
+    DPAD_CENTER("ok"),
+    POWER("power");
 
     companion object {
         fun fromWire(value: String): RemoteKey? = entries.firstOrNull { it.wire == value }

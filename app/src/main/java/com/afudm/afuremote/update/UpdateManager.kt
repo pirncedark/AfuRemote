@@ -17,7 +17,8 @@ object UpdateManager {
     private const val API = "https://api.github.com/repos/pirncedark/AfuRemote/releases"
     private const val PREFS = "afuremote_updates"
     private const val LAST_CHECK = "last_check"
-    private const val DAY_MS = 24L * 60 * 60 * 1000
+    // Otomatik denetim her açılışta; GitHub sınırına takılmamak için en sık saatte bir.
+    private const val AUTO_CHECK_MS = 60L * 60 * 1000
     private val http = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS).build()
 
     suspend fun check(currentVersionCode: Int): AppUpdate? = withContext(Dispatchers.IO) {
@@ -28,7 +29,7 @@ object UpdateManager {
     }
 
     fun shouldCheckAutomatically(context: Context): Boolean =
-        System.currentTimeMillis() - prefs(context).getLong(LAST_CHECK, 0L) >= DAY_MS
+        System.currentTimeMillis() - prefs(context).getLong(LAST_CHECK, 0L) >= AUTO_CHECK_MS
 
     fun markChecked(context: Context) = prefs(context).edit().putLong(LAST_CHECK, System.currentTimeMillis()).apply()
 

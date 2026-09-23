@@ -75,6 +75,10 @@ echo "OK 9: shared link opened on TV"
 
 # 10) Download and open the in-app update installer.
 adb shell am start -n "$PKG/.MainActivity" >/dev/null
+# Phone mode keeps the update controls on the settings page (gear, content-desc "Ayarlar").
+wait_text 40 "Ayarlar" settings_button || fail "settings button did not appear"
+dismiss_update settings_button
+tap_text settings_button "Ayarlar" || fail "settings button was not found"
 wait_text 40 "Güncellemeleri denetle" update_check || fail "update check button did not appear"
 tap_text update_check "Güncellemeleri denetle" || fail "update check button was not found"
 if ! wait_text 30 "Yeni AfuRemote sürümü: 0.1.0" update_dialog; then
