@@ -1,6 +1,6 @@
 # AfuRemote — Tasarım (v1)
 
-Tarih: 2026-09-23 · Durum: taslak, kullanıcı onayı bekliyor
+Tarih: 2026-09-23 · Durum: onaylandı (2026-09-23)
 
 ## 1. Amaç
 
@@ -88,9 +88,9 @@ Range (206) destekli; yalnızca paylaşılan tek dosya; uygulama/paylaşım biti
 
 AfuTube modeli: `afuremote-v*` etiketli GitHub Release; `AfuRemote-universal.apk` + `.sha256`; aynı anahtarla imza
 (yeni anahtar `afuremote-release.jks`, `afuproject\_gizli` altında + GitHub secret). Açılışta günde bir + Ayarlar'da
-"Güncellemeleri denetle"; indirme ön planda % bildirimle; SHA-256 doğrulaması; "kurmak için dokun". Repo: **`pirncedark/AfuRemote` (private)** —
-private repoda release asset'leri anonim indirilemez; bu yüzden güncelleme dosyaları **public bir release deposuna**
-(`pirncedark/AfuRemote-releases`, sadece APK) yüklenir. *(AfuTube public AfuDM deposunu kullanıyor; burada kaynak gizli kalır.)*
+"Güncellemeleri denetle"; indirme ön planda % bildirimle; SHA-256 doğrulaması; "kurmak için dokun".
+Repo: **`pirncedark/AfuRemote` — PUBLIC** (kullanıcı kararı 2026-09-23): kaynak + release'ler tek depoda; uygulama
+GitHub API'sini ve asset'leri girişsiz okur. İmza anahtarı ve şifreleri depoya ASLA girmez (yalnız GitHub secrets).
 
 ## 8. Test ve kalite kapısı
 
