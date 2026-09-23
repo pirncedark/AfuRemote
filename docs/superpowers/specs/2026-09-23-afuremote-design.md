@@ -114,5 +114,6 @@ WorkManager (güncelleme). Derleme yalnız GitHub Actions'ta (bu PC'de SDK yok).
 ## 10. Riskler
 
 - Bazı TV'lerde (Samsung Tizen, LG webOS) Android yok → uygulama kurulamaz; v1 yalnız Android TV / Google TV.
-- Geri/ev için Erişilebilirlik izni kullanıcı adımı ister (Android kısıtı; başka yolu yok).
+- Erişilebilirlik izni (TV'de bir kez) iki şey için gerekir: geri/ev tuşları ve AfuRemote ekranda değilken oynatıcı/onay ekranı açmak
+  (Android 10+ arka plandan ekran açmayı engeller; bağlı erişilebilirlik servisi resmi istisnadır). İzin kapalıyken yalnız AfuRemote TV ekranı açıksa link açılır; telefon net uyarı gösterir.
 - Ev ağında mDNS'i engelleyen router/"AP isolation" → keşif olmaz; v1'de elle IP girme **yok**, hata mesajı bunu söyler.
