@@ -44,7 +44,7 @@ fun UpdateSection(versionCode: Int, versionName: String) {
         .getWorkInfosForUniqueWorkFlow("afuremote_update")
         .collectAsState(initial = emptyList())
     // A finished download of the version that is now installed (or older) is stale: never offer it again.
-    val work = workInfos.lastOrNull()?.takeIf { it.inputData.getInt(ApkDownloadWorker.KEY_VERSION_CODE, 0) > versionCode }
+    val work = workInfos.lastOrNull()?.takeIf { UpdateManager.versionCodeOf(it.tags) > versionCode }
     val apkPath = work?.outputData?.getString(ApkDownloadWorker.KEY_APK_PATH)
 
     DisposableEffect(lifecycleOwner) {
@@ -105,8 +105,8 @@ fun UpdateSection(versionCode: Int, versionName: String) {
                 Text("İndiriliyor… %$percent")
             }
             WorkInfo.State.FAILED -> {
-                Text(work.outputData.getString("error") ?: "Güncelleme indirilemedi")
-                OutlinedButton(onClick = { UpdateManager.retryDownload(context, work.inputData) }) {
+                Text(work.outputData.getString(ApkDownloadWorker.KEY_ERROR) ?: "Güncelleme indirilemedi")
+                OutlinedButton(onClick = { UpdateManager.retryDownload(context, work.outputData) }) {
                     Text("Tekrar dene")
                 }
             }

@@ -18,4 +18,10 @@ class InstallerTest {
     fun `download worker output key is apkPath`() {
         assertEquals("apkPath", ApkDownloadWorker.KEY_APK_PATH)
     }
+
+    @Test
+    fun `download job version is read from its tag`() {
+        assertEquals(1_000, UpdateManager.versionCodeOf(setOf("com.afudm.afuremote.update.ApkDownloadWorker", "afuremote-version:1000")))
+        assertEquals(0, UpdateManager.versionCodeOf(setOf("com.afudm.afuremote.update.ApkDownloadWorker")))
+    }
 }

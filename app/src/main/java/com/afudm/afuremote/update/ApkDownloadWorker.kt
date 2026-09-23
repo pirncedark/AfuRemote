@@ -8,6 +8,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -27,7 +28,14 @@ class ApkDownloadWorker(context: Context, params: WorkerParameters) : CoroutineW
         check(Sha256.verify(apk, expected)) { "İndirilen dosyanın güvenlik özeti tutmadı" }
         notifyReady(apk)
         Result.success(workDataOf(KEY_APK_PATH to apk.absolutePath))
-    }.getOrElse { Result.failure(workDataOf("error" to (it.localizedMessage ?: "Güncelleme indirilemedi"))) }
+    }.getOrElse {
+        // Keep the input so the update screen can retry the same download.
+        val output = Data.Builder()
+            .putAll(inputData)
+            .putString(KEY_ERROR, it.localizedMessage ?: "Güncelleme indirilemedi")
+            .build()
+        Result.failure(output)
+    }
 
     private suspend fun download(url: String, target: File) {
         val connection = URL(url).openConnection() as HttpURLConnection
@@ -93,6 +101,7 @@ class ApkDownloadWorker(context: Context, params: WorkerParameters) : CoroutineW
         const val KEY_SHA = "checksumUrl"
         const val KEY_APK_PATH = "apkPath"
         const val KEY_VERSION_CODE = "versionCode"
+        const val KEY_ERROR = "error"
         const val KEY_PROGRESS = "percent"
         private const val INSTALL_CHANNEL = "afuremote_update_install"
         private const val PROGRESS_CHANNEL = "afuremote_update_progress"

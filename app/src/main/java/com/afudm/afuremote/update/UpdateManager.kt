@@ -46,9 +46,16 @@ object UpdateManager {
     private fun enqueueDownload(context: Context, input: Data) {
         val request = OneTimeWorkRequestBuilder<ApkDownloadWorker>()
             .setInputData(input)
+            .addTag(VERSION_TAG + input.getInt(ApkDownloadWorker.KEY_VERSION_CODE, 0))
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork("afuremote_update", ExistingWorkPolicy.REPLACE, request)
     }
+
+    /** Version code of the release a download job belongs to, read back from its tag. */
+    fun versionCodeOf(tags: Set<String>): Int =
+        tags.firstNotNullOfOrNull { tag -> tag.takeIf { it.startsWith(VERSION_TAG) }?.removePrefix(VERSION_TAG)?.toIntOrNull() } ?: 0
+
+    private const val VERSION_TAG = "afuremote-version:"
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }
