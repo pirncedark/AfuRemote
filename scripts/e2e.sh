@@ -49,7 +49,7 @@ echo "OK 8: TV discovered"
 
 # 9) share a link into AfuRemote, approve pairing on TV, and play on TV
 adb logcat -c
-adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "Film: $MP4" -n "$PKG/.phone.ShareActivity" >/dev/null
+adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "'Film: $MP4'" -n "$PKG/.phone.ShareActivity" >/dev/null
 sleep 2
 dump share_launch
 # Some emulator images display Android's target picker even for a component-qualified SEND intent.
