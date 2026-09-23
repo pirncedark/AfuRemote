@@ -18,6 +18,7 @@ import com.afudm.afuremote.ui.AfuTheme
 import com.afudm.afuremote.tv.AfuTvService
 import com.afudm.afuremote.tv.TvHomeScreen
 import com.afudm.afuremote.phone.PhoneHomeScreen
+import com.afudm.afuremote.update.UpdateSection
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,8 +31,8 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(mode) { if (mode == AppMode.TV) AfuTvService.start(this@MainActivity) }
                 Surface(Modifier.fillMaxSize()) {
                     when (mode) {
-                        AppMode.TV -> TvHomeScreen(BuildConfig.VERSION_NAME, change)
-                        AppMode.PHONE -> PhoneHomeScreen(BuildConfig.VERSION_NAME, change)
+                        AppMode.TV -> TvHomeScreen(BuildConfig.VERSION_NAME, change) { UpdateSection(BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME) }
+                        AppMode.PHONE -> PhoneHomeScreen(BuildConfig.VERSION_NAME, change) { UpdateSection(BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME) }
                     }
                 }
             }
