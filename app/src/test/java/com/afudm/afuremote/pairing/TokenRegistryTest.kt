@@ -1,4 +1,4 @@
-﻿package com.afudm.afuremote.pairing
+package com.afudm.afuremote.pairing
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -42,8 +42,10 @@ class TokenRegistryTest {
     fun `nonce cache is bounded to 256 entries`() {
         val registry = TokenRegistry()
         repeat(257) { assertTrue(registry.acceptNonce("d", "n$it", 1_000)) }
+        // The oldest nonce was evicted to keep 256 entries; the newest ones are still remembered.
         assertTrue(registry.acceptNonce("d", "n0", 1_000))
-        assertFalse(registry.acceptNonce("d", "n1", 1_000))
+        assertFalse(registry.acceptNonce("d", "n256", 1_000))
+        assertFalse(registry.acceptNonce("d", "n0", 1_000))
     }
 
     @Test

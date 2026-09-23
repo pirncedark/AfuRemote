@@ -1,21 +1,38 @@
 package com.afudm.afuremote.pairing
 
-/** TV-side device key allowlist and bounded replay cache. */
+/** TV-side allowlist: one derived auth key per approved device, plus a bounded replay cache. */
 class TokenRegistry(private val keys: MutableMap<String, String> = mutableMapOf()) {
     private val nonces = mutableMapOf<String, LinkedHashMap<String, Long>>()
-    @Synchronized fun issue(deviceId: String, key: ByteArray) { keys[deviceId] = PairCrypto.hex(key) }
-    @Synchronized fun keyFor(deviceId: String): ByteArray? = keys[deviceId]?.let { runCatching { it.chunked(2).map { b -> b.toInt(16).toByte() }.toByteArray() }.getOrNull() }
+
+    @Synchronized fun issue(deviceId: String, key: ByteArray) {
+        keys[deviceId] = PairCrypto.hex(key)
+    }
+
+    @Synchronized fun keyFor(deviceId: String): ByteArray? = keys[deviceId]?.let { hex ->
+        runCatching { hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray() }.getOrNull()
+    }
+
+    /** False when [nonce] was already used by [deviceId] in the last two minutes. */
     @Synchronized fun acceptNonce(deviceId: String, nonce: String, now: Long): Boolean {
         val cache = nonces.getOrPut(deviceId) { LinkedHashMap() }
-        cache.entries.removeAll { now - it.value > 120_000 }
+        cache.entries.removeAll { now - it.value > NONCE_TTL_MS }
         if (nonce in cache) return false
         cache[nonce] = now
-        while (cache.size > 256) cache.remove(cache.keys.first())
+        while (cache.size > MAX_NONCES) cache.remove(cache.keys.first())
         return true
     }
+
     @Synchronized fun snapshot(): Map<String, String> = keys.toMap()
-    @Synchronized fun clear() { keys.clear(); nonces.clear() }
+
+    @Synchronized fun clear() {
+        keys.clear()
+        nonces.clear()
+    }
+
     companion object {
-        fun randomToken(): String = java.security.SecureRandom().let { r -> ByteArray(24).also(r::nextBytes).let(PairCrypto::hex) }
+        private const val NONCE_TTL_MS = 120_000L
+        private const val MAX_NONCES = 256
+
+        fun randomToken(): String = ByteArray(24).also { java.security.SecureRandom().nextBytes(it) }.let(PairCrypto::hex)
     }
 }
