@@ -1,5 +1,4 @@
 <resources>
     <string name="app_name">AfuRemote</string>
-    <string name="erisilebilirlik_aciklama">AfuRemote, telefondan gelen geri/ana ekran tuşlarını uygulamak ve paylaşılan videoları TV'de açmak için bu izne ihtiyaç duyar. Ekran içeriğini okumaz.</string>
+    <string name="erisilebilirlik_aciklama">AfuRemote, telefondan gelen geri/ana ekran tu&#351;lar&#305;n&#305; uygulamak ve payla&#351;&#305;lan videolar&#305; TV&#x2019;de a&#231;mak i&#231;in bu izne ihtiya&#231; duyar. Ekran i&#231;eri&#287;ini okumaz.</string>
 </resources>
-
