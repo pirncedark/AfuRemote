@@ -2,13 +2,13 @@
 # One Android emulator acts as both TV and phone client.
 set -u
 APK="$1"; PKG=com.afudm.afuremote; OUT=e2e-out
-MP4="https://www.w3schools.com/html/mov_bbb.mp4"; TOKEN=""
+MP4="https://www.w3schools.com/html/mov_bbb.mp4"; STATE="e2e-out/pair-state.json"; AUTH=0
 mkdir -p "$OUT"
 fail() { echo "HATA: $*"; adb exec-out screencap -p > "$OUT/hata.png"; adb logcat -d > "$OUT/logcat-son.txt"; grep -A25 "FATAL EXCEPTION" "$OUT/tam.log" | head -60; exit 1; }
 dump() { adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml > "$OUT/$1.xml" 2>/dev/null; }
 wait_text() { local lim=$1 text=$2 name=$3 t=0; while [ "$t" -lt "$lim" ]; do dump "$name"; grep -q "$text" "$OUT/$name.xml" && return 0; sleep 2; t=$((t+2)); done; return 1; }
 wait_log() { local lim=$1 pattern=$2 t=0; while [ "$t" -lt "$lim" ]; do adb logcat -d | grep -q "$pattern" && return 0; sleep 2; t=$((t+2)); done; return 1; }
-api() { local method=$1 path=$2 body=${3:-} maxt=${4:-10}; local args=(-s -o "$OUT/resp.json" -w "%{http_code}" --max-time "$maxt" -X "$method" -H "Content-Type: application/json"); [ -n "$TOKEN" ] && args+=(-H "X-Afu-Token: $TOKEN"); [ -n "$body" ] && args+=(-d "$body"); curl "${args[@]}" "http://127.0.0.1:9870$path"; }
+api() { local method=$1 path=$2 body=${3:-} maxt=${4:-10}; local args=(-s -o "$OUT/resp.json" -w "%{http_code}" --max-time "$maxt" -X "$method" -H "Content-Type: application/json"); if [ "$AUTH" = 1 ]; then mapfile -t h < <(python3 scripts/afu_pair.py sign "$STATE" "$method" "$path" "$body"); args+=(-H "X-Afu-Device: ${h[0]}" -H "X-Afu-Time: ${h[1]}" -H "X-Afu-Nonce: ${h[2]}" -H "X-Afu-Sig: ${h[3]}"); fi; [ -n "$body" ] && args+=(--data-binary "$body"); curl "${args[@]}" "http://127.0.0.1:9870$path"; }
 tap_text() { local xy; xy=$(python3 scripts/ui.py tap-text "$OUT/$1.xml" "$2") || return 1; adb shell input tap $xy; }
 
 adb install -r "$APK" || fail "APK install failed"
@@ -23,11 +23,18 @@ code=""; for _ in $(seq 1 15); do code=$(api GET /v1/info); [ "$code" = 200 ] &&
 echo "OK 1: TV server"
 code=$(api POST /v1/key '{"key":"vol_up"}'); [ "$code" = 401 ] || fail "unauthorized request should return 401 ($code)"
 echo "OK 2: unauthorized request rejected"
-( code=$(api POST /v1/pair '{"deviceName":"e2e","deviceId":"e2e-device"}' 70); echo "$code" > "$OUT/pair_code.txt"; cp "$OUT/resp.json" "$OUT/pair.json" ) & PAIR_PID=$!
-wait_text 30 "İzin ver" pair_prompt || fail "pair approval prompt did not appear"
+PAIR_BODY=$(python3 scripts/afu_pair.py start e2e-device e2e "$STATE")
+code=$(api POST /v1/pair/start "$PAIR_BODY"); [ "$code" = 200 ] || fail "pair/start returned $code"
+cp "$OUT/resp.json" "$OUT/pair.json"
+TVPUB=$(python3 -c "import json;print(json.load(open('$OUT/pair.json'))['tvPub'])")
+PAIRID=$(python3 -c "import json;print(json.load(open('$OUT/pair.json'))['pairId'])")
+PAIRCODE=$(python3 scripts/afu_pair.py finish "$STATE" "$TVPUB")
+wait_text 30 "$PAIRCODE" pair_prompt || fail "TV pairing code $PAIRCODE did not appear"
+( code=$(api POST /v1/pair/confirm "{\"pairId\":\"$PAIRID\"}" 70); echo "$code" > "$OUT/pair_code.txt" ) & PAIR_PID=$!
+wait_text 30 "İzin ver" pair_prompt || fail "pair approval button did not appear"
 tap_text pair_prompt "İzin ver" || fail "approval button not found"
-wait "$PAIR_PID"; [ "$(cat "$OUT/pair_code.txt")" = 200 ] || fail "pair request did not return 200"
-TOKEN=$(python3 -c "import json;print(json.load(open('$OUT/pair.json'))['token'])"); echo "OK 3: pairing"
+wait "$PAIR_PID"; [ "$(cat "$OUT/pair_code.txt")" = 200 ] || fail "pair confirm did not return 200"
+AUTH=1; echo "OK 3: secure pairing and code verified"
 adb shell input keyevent KEYCODE_HOME; sleep 2; adb logcat -c
 code=$(api POST /v1/open "{\"url\":\"$MP4\",\"title\":\"e2e\"}"); [ "$code" = 200 ] || fail "/v1/open returned $code: $(cat "$OUT/resp.json")"
 wait_log 60 "AfuRemotePlayer: state=PLAYING" || fail "video did not play on TV"

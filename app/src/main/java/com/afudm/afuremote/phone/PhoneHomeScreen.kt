@@ -57,7 +57,7 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
             }
         }
     }
-    val onPairing: () -> Unit = { status = Messages.WAITING_TV }
+    val onPairing: (String) -> Unit = { status = it }
     fun key(k: RemoteKey) = send { graph.controller.key(it, k, onPairing) }
 
     Column(

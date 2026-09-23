@@ -58,17 +58,32 @@ jobs:
           body: |
             # AfuRemote ${{ github.ref_name }}
 
-            Share a link or a video from your phone and it opens on your Android TV on the same Wi-Fi. Your phone also works as a TV remote.
+            Share a link or video from your phone to open it on your Android TV over the same Wi-Fi network. Your phone also works as the TV remote.
 
             ## Install
-            Install the same `AfuRemote-universal.apk` on the phone and on the Android TV. Later versions update from inside the app without removing data.
+            Download `AfuRemote-universal.apk` from GitHub Releases and install the same APK on your Android phone and Android TV.
+            Later versions update from inside the app (SHA-256 verified) without removing data.
+
+            ## Pairing
+            Make sure both devices are on the same Wi-Fi network. Compare the six-digit codes shown on the TV and phone; if they match, select **Allow** on the TV.
+
+            ## First-time setup on TV
+            On the TV, open **Settings → Accessibility → AfuRemote** and turn it **On**. This enables the back and home remote buttons and allows AfuRemote to open screens while in the background.
 
             ---
 
             ## Türkçe
-            Telefondan paylaşılan link ya da video aynı Wi-Fi'deki Android TV'de açılır; telefon TV kumandası olur.
-            Aynı `AfuRemote-universal.apk` dosyasını telefona ve TV'ye kurun. Sonraki sürümler uygulamanın içinden, veriler silinmeden gelir.
-            TV'de bir kez: Ayarlar → Erişilebilirlik → AfuRemote → Aç (geri/ana ekran tuşları ve arka planda açma için).
+            Telefonunuzdan bir bağlantı veya video paylaşarak aynı Wi-Fi ağındaki Android TV'de açın; telefonunuzu TV kumandası olarak da kullanın.
+
+            ## Kurulum
+            `AfuRemote-universal.apk` dosyasını GitHub Releases sayfasından indirin ve aynı APK'yı Android telefonunuza ve Android TV'nize kurun.
+            Sonraki sürümler uygulamanın içinden (SHA-256 doğrulamalı), veriler silinmeden gelir.
+
+            ## Eşleştirme
+            İki cihazın da aynı Wi-Fi ağına bağlı olduğundan emin olun. TV'de ve telefonda gösterilen altı haneli kodları karşılaştırın; kodlar aynıysa TV'de **İzin ver** seçeneğini seçin.
+
+            ## TV'de ilk kurulum
+            TV'de **Ayarlar → Erişilebilirlik → AfuRemote** bölümünü açıp **Açık** duruma getirin. Bu işlem geri ve ana ekran kumanda tuşlarını etkinleştirir ve AfuRemote'un arka plandayken ekran açmasına izin verir.
           files: |
             release-assets/AfuRemote-universal.apk
             release-assets/AfuRemote-universal.apk.sha256

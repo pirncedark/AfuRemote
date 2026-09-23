@@ -1,6 +1,5 @@
 package com.afudm.afuremote.tv
 
-import com.afudm.afuremote.protocol.TOKEN_HEADER
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.runBlocking
 
@@ -18,13 +17,13 @@ class TvHttpServer(private val router: TvRouter) : NanoHTTPD(PORT) {
             }
             }.getOrElse { return badRequest() }
         } else ""
-        val token = session.headers[TOKEN_HEADER.lowercase()]
-        val routed = runCatching { runBlocking { router.handle(session.method.name, session.uri, token, body) } }
+        val routed = runCatching { runBlocking { router.handle(session.method.name, session.uri, session.headers, body) } }
             .getOrElse { return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, JSON, "{\"ok\":false,\"hata\":\"sunucu_hatasi\"}") }
         val status = when (routed.status) {
             200 -> Response.Status.OK
             400 -> Response.Status.BAD_REQUEST
             401 -> Response.Status.UNAUTHORIZED
+            405 -> Response.Status.METHOD_NOT_ALLOWED
             403 -> Response.Status.FORBIDDEN
             404 -> Response.Status.NOT_FOUND
             409 -> Response.Status.CONFLICT

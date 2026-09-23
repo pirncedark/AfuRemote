@@ -12,6 +12,9 @@ object Messages {
     const val DENIED = "TV onay vermedi ya da 60 sn içinde yanıt gelmedi"
     const val WAITING_TV = "TV ekranındaki onayı bekliyor… (TV kumandasıyla onaylayın)"
     const val ACCESSIBILITY = "TV'de AfuRemote için Erişilebilirlik iznini açın (TV: Ayarlar → Erişilebilirlik → AfuRemote)"
+    const val CLOCK = "TV ile telefonun saati eşitlenemedi — TV saatini kontrol edin"
+
+    fun pairingCode(code: String) = "TV'deki kod: $code — aynıysa TV kumandasıyla onaylayın"
 
     fun forError(code: Int, body: String?): String {
         val hata = body?.let { runCatching { ProtocolJson.decodeFromString<ApiResult>(it).hata }.getOrNull() }.orEmpty()

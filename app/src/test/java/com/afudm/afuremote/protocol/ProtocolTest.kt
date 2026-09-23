@@ -22,7 +22,7 @@ class ProtocolTest {
 
     @Test(expected = SerializationException::class)
     fun `missing required field fails loudly`() {
-        ProtocolJson.decodeFromString<PairRequest>("""{"deviceName":"x"}""")
+        ProtocolJson.decodeFromString<PairStartRequest>("""{"deviceId":"d","deviceName":"x"}""")
     }
 
     @Test

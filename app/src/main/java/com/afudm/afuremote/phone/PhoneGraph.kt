@@ -17,7 +17,7 @@ object PhoneGraph {
 
     private fun create(app: Context): Graph {
         val store = PairingStore(app)
-        val client = TvClient()
+        val client = TvClient(deviceIdProvider = store::deviceId)
         val name = Settings.Global.getString(app.contentResolver, Settings.Global.DEVICE_NAME)?.takeIf { it.isNotBlank() } ?: Build.MODEL
         return Graph(store, client, TvDiscovery(app, client), PhoneController(client, store, name))
     }

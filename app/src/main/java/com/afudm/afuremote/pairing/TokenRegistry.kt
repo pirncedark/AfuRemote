@@ -1,27 +1,21 @@
 package com.afudm.afuremote.pairing
 
-import java.security.SecureRandom
-
-/** TV-side allowlist: one token per approved device. */
-class TokenRegistry(
-    private val tokens: MutableMap<String, String> = mutableMapOf(),
-    private val newToken: () -> String = { randomToken() }
-) {
-    @Synchronized fun issue(deviceId: String): String = newToken().also { tokens[deviceId] = it }
-
-    @Synchronized fun isValid(token: String?): Boolean = !token.isNullOrBlank() && token in tokens.values
-
-    @Synchronized fun snapshot(): Map<String, String> = tokens.toMap()
-
-    @Synchronized fun clear() = tokens.clear()
-
+/** TV-side device key allowlist and bounded replay cache. */
+class TokenRegistry(private val keys: MutableMap<String, String> = mutableMapOf()) {
+    private val nonces = mutableMapOf<String, LinkedHashMap<String, Long>>()
+    @Synchronized fun issue(deviceId: String, key: ByteArray) { keys[deviceId] = PairCrypto.hex(key) }
+    @Synchronized fun keyFor(deviceId: String): ByteArray? = keys[deviceId]?.let { runCatching { it.chunked(2).map { b -> b.toInt(16).toByte() }.toByteArray() }.getOrNull() }
+    @Synchronized fun acceptNonce(deviceId: String, nonce: String, now: Long): Boolean {
+        val cache = nonces.getOrPut(deviceId) { LinkedHashMap() }
+        cache.entries.removeAll { now - it.value > 120_000 }
+        if (nonce in cache) return false
+        cache[nonce] = now
+        while (cache.size > 256) cache.remove(cache.keys.first())
+        return true
+    }
+    @Synchronized fun snapshot(): Map<String, String> = keys.toMap()
+    @Synchronized fun clear() { keys.clear(); nonces.clear() }
     companion object {
-        private val random = SecureRandom()
-
-        fun randomToken(): String {
-            val bytes = ByteArray(24)
-            random.nextBytes(bytes)
-            return bytes.joinToString("") { "%02x".format(it) }
-        }
+        fun randomToken(): String = java.security.SecureRandom().let { r -> ByteArray(24).also(r::nextBytes).let(PairCrypto::hex) }
     }
 }

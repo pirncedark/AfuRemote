@@ -91,7 +91,7 @@ class ShareActivity : ComponentActivity() {
                 OpenRequest(url, "Telefondan video", forceMedia = true)
             }
         }
-        when (val r = graph.controller.open(tv, request) { status.value = Messages.WAITING_TV }) {
+        when (val r = graph.controller.open(tv, request) { status.value = it }) {
             SendResult.Ok -> { status.value = "TV'de açıldı ✓"; delay(1_200); finish() }
             SendResult.Unauthorized -> status.value = Messages.DENIED
             is SendResult.Failed -> status.value = r.message

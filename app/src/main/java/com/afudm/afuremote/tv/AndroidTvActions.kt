@@ -20,8 +20,10 @@ class AndroidTvActions(private val context: Context, private val store: PairingS
     override fun info() = InfoResponse(store.deviceId(), deviceName(), android.os.Build.MODEL.orEmpty(), BuildConfig.VERSION_NAME)
     fun deviceName(): String = android.os.Build.MODEL?.takeIf { it.isNotBlank() } ?: "AfuRemote TV"
 
-    override suspend fun askPairApproval(req: com.afudm.afuremote.protocol.PairRequest): PairDecision =
-        PairBroker.request(context, req.deviceId, req.deviceName)
+    override fun startPairPrompt(pairId: String, req: com.afudm.afuremote.protocol.PairStartRequest, code: String): Boolean =
+        PairBroker.begin(context, pairId, req.deviceId, req.deviceName, code)
+
+    override suspend fun awaitPairApproval(pairId: String): PairDecision = PairBroker.await(pairId)
 
     override fun open(link: ClassifiedLink, title: String): ApiResult {
         val intent = when (link.kind) {

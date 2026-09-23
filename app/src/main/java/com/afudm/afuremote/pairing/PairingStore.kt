@@ -9,13 +9,13 @@ import kotlinx.serialization.encodeToString
 class PairingStore(context: Context) : TokenStore {
     private val prefs = context.getSharedPreferences("afuremote_pairing", Context.MODE_PRIVATE)
 
-    fun approvedDevices(): Map<String, String> = read(KEY_APPROVED)
+    fun approvedDevices(): Map<String, String> = read(KEY_DEVICE_KEYS)
     fun tvRegistry(): TokenRegistry = TokenRegistry(approvedDevices().toMutableMap())
-    fun saveApproved(map: Map<String, String>) = write(KEY_APPROVED, map)
+    fun saveApproved(map: Map<String, String>) = write(KEY_DEVICE_KEYS, map)
 
-    override fun tokenForTv(tvId: String): String? = read(KEY_TV_TOKENS)[tvId]
-    override fun saveTokenForTv(tvId: String, token: String) = write(KEY_TV_TOKENS, read(KEY_TV_TOKENS) + (tvId to token))
-    override fun forgetTv(tvId: String) = write(KEY_TV_TOKENS, read(KEY_TV_TOKENS) - tvId)
+    override fun keyForTv(tvId: String): String? = read(KEY_TV_KEYS)[tvId]
+    override fun saveKeyForTv(tvId: String, key: String) = write(KEY_TV_KEYS, read(KEY_TV_KEYS) + (tvId to key))
+    override fun forgetTv(tvId: String) = write(KEY_TV_KEYS, read(KEY_TV_KEYS) - tvId)
 
     @Synchronized
     override fun deviceId(): String =
@@ -31,8 +31,8 @@ class PairingStore(context: Context) : TokenStore {
     }
 
     private companion object {
-        const val KEY_APPROVED = "approved"
-        const val KEY_TV_TOKENS = "tv_tokens"
+        const val KEY_DEVICE_KEYS = "device_auth_keys_v1"
+        const val KEY_TV_KEYS = "tv_auth_keys_v1"
         const val KEY_DEVICE_ID = "device_id"
     }
 }
