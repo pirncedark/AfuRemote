@@ -1,0 +1,89 @@
+name: Release AfuRemote
+
+on:
+  push:
+    tags:
+      - 'afuremote-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Gradle & generate wrapper
+        run: |
+          GRADLE_VERSION="9.6.0"
+          wget -q "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -O /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp/
+          export PATH="/tmp/gradle-${GRADLE_VERSION}/bin:$PATH"
+          gradle wrapper --gradle-version ${GRADLE_VERSION} --distribution-type bin
+          chmod +x gradlew
+
+      - name: Decode keystore
+        env:
+          AFUREMOTE_KEYSTORE_B64: ${{ secrets.AFUREMOTE_KEYSTORE_B64 }}
+        run: echo "$AFUREMOTE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/afuremote-release.p12"
+
+      - name: Test + signed release APK
+        env:
+          AFUREMOTE_KEYSTORE_PATH: ${{ runner.temp }}/afuremote-release.p12
+          AFUREMOTE_KEYSTORE_PASS: ${{ secrets.AFUREMOTE_KEYSTORE_PASS }}
+          AFUREMOTE_KEY_ALIAS: ${{ secrets.AFUREMOTE_KEY_ALIAS }}
+          AFUREMOTE_KEY_PASS: ${{ secrets.AFUREMOTE_KEY_PASS }}
+        run: |
+          VERSION_NAME="${GITHUB_REF_NAME#afuremote-v}"
+          BASE_VERSION="${VERSION_NAME%%-*}"
+          VERSION_CODE=$(echo "$BASE_VERSION" | awk -F. '{print ($1*1000000)+($2*1000)+$3}')
+          ./gradlew test assembleRelease --no-daemon --stacktrace -PversionCode="$VERSION_CODE" -PversionName="$VERSION_NAME"
+
+      - name: Prepare assets
+        run: |
+          mkdir -p release-assets
+          cp app/build/outputs/apk/release/app-release.apk release-assets/AfuRemote-universal.apk
+          (cd release-assets && sha256sum AfuRemote-universal.apk > AfuRemote-universal.apk.sha256)
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: AfuRemote ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-test') || contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          body: |
+            # AfuRemote ${{ github.ref_name }}
+
+            Share a link or video from your phone to open it on your Android TV over the same Wi-Fi network. Your phone also works as the TV remote.
+
+            ## Install
+            Download `AfuRemote-universal.apk` from GitHub Releases and install the same APK on your Android phone and Android TV.
+            Later versions update from inside the app (SHA-256 verified) without removing data.
+
+            ## Pairing
+            Make sure both devices are on the same Wi-Fi network. Compare the six-digit codes shown on the TV and phone; if they match, select **Allow** on the TV.
+
+            ## First-time setup on TV
+            On the TV, open **Settings → Accessibility → AfuRemote** and turn it **On**. This enables the back and home remote buttons and allows AfuRemote to open screens while in the background.
+
+            ---
+
+            ## Türkçe
+            Telefonunuzdan bir bağlantı veya video paylaşarak aynı Wi-Fi ağındaki Android TV'de açın; telefonunuzu TV kumandası olarak da kullanın.
+
+            ## Kurulum
+            `AfuRemote-universal.apk` dosyasını GitHub Releases sayfasından indirin ve aynı APK'yı Android telefonunuza ve Android TV'nize kurun.
+            Sonraki sürümler uygulamanın içinden (SHA-256 doğrulamalı), veriler silinmeden gelir.
+
+            ## Eşleştirme
+            İki cihazın da aynı Wi-Fi ağına bağlı olduğundan emin olun. TV'de ve telefonda gösterilen altı haneli kodları karşılaştırın; kodlar aynıysa TV'de **İzin ver** seçeneğini seçin.
+
+            ## TV'de ilk kurulum
+            TV'de **Ayarlar → Erişilebilirlik → AfuRemote** bölümünü açıp **Açık** duruma getirin. Bu işlem geri ve ana ekran kumanda tuşlarını etkinleştirir ve AfuRemote'un arka plandayken ekran açmasına izin verir.
+          files: |
+            release-assets/AfuRemote-universal.apk
+            release-assets/AfuRemote-universal.apk.sha256

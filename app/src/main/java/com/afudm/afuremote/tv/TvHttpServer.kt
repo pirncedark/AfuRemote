@@ -1,0 +1,38 @@
+package com.afudm.afuremote.tv
+
+import fi.iki.elonen.NanoHTTPD
+import kotlinx.coroutines.runBlocking
+
+class TvHttpServer(private val router: TvRouter) : NanoHTTPD(PORT) {
+    override fun serve(session: IHTTPSession): Response {
+        val body = if (session.method == Method.POST) {
+            val contentLength = session.headers["content-length"]?.toLongOrNull()
+                ?: return badRequest()
+            if (contentLength !in 0..MAX_BODY.toLong()) return badRequest()
+            runCatching {
+            val files = HashMap<String, String>()
+            session.parseBody(files)
+            files["postData"].orEmpty().also {
+                if (it.toByteArray().size > MAX_BODY) throw IllegalArgumentException("body too large")
+            }
+            }.getOrElse { return badRequest() }
+        } else ""
+        val routed = runCatching { runBlocking { router.handle(session.method.name, session.uri, session.headers, body) } }
+            .getOrElse { return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, JSON, "{\"ok\":false,\"hata\":\"sunucu_hatasi\"}") }
+        val status = when (routed.status) {
+            200 -> Response.Status.OK
+            400 -> Response.Status.BAD_REQUEST
+            401 -> Response.Status.UNAUTHORIZED
+            405 -> Response.Status.METHOD_NOT_ALLOWED
+            403 -> Response.Status.FORBIDDEN
+            404 -> Response.Status.NOT_FOUND
+            409 -> Response.Status.CONFLICT
+            else -> Response.Status.INTERNAL_ERROR
+        }
+        return newFixedLengthResponse(status, JSON, routed.body)
+    }
+
+    private fun badRequest() = newFixedLengthResponse(Response.Status.BAD_REQUEST, JSON, "{\"ok\":false,\"hata\":\"bozuk_istek\"}")
+
+    companion object { private const val PORT = 9870; private const val MAX_BODY = 64 * 1024; private const val JSON = "application/json" }
+}

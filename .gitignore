@@ -8,3 +8,6 @@ local.properties
 *.iml
 captures/
 .superpowers/
+gradlew
+gradlew.bat
+gradle/wrapper/
