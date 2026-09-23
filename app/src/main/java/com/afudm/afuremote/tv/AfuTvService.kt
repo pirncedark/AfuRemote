@@ -36,7 +36,7 @@ class AfuTvService : Service() {
     private fun startServer() {
         val reg = store.tvRegistry().also { registry = it }
         val actions = AndroidTvActions(applicationContext, store)
-        val router = TvRouter(actions, reg) { store.saveApproved(it) }
+        val router = TvRouter(actions, reg, onPairingsChanged = { store.saveApproved(it) })
         server = try { TvHttpServer(router).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false) } }
         catch (e: IOException) { Log.e(TAG, "TV sunucusu acilamadi", e); null }
         if (server != null) {
