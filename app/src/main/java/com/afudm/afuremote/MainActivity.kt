@@ -4,24 +4,20 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.afudm.afuremote.mode.AppMode
 import com.afudm.afuremote.mode.ModeStore
 import com.afudm.afuremote.ui.AfuTheme
-import com.afudm.afuremote.ui.ModeSection
 import com.afudm.afuremote.tv.AfuTvService
 import com.afudm.afuremote.tv.TvHomeScreen
+import com.afudm.afuremote.phone.PhoneHomeScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,10 +31,7 @@ class MainActivity : ComponentActivity() {
                 Surface(Modifier.fillMaxSize()) {
                     when (mode) {
                         AppMode.TV -> TvHomeScreen(BuildConfig.VERSION_NAME, change)
-                        AppMode.PHONE -> Column(Modifier.padding(24.dp)) {
-                            Text("AfuRemote")
-                            ModeSection(change)
-                        }
+                        AppMode.PHONE -> PhoneHomeScreen(BuildConfig.VERSION_NAME, change)
                     }
                 }
             }

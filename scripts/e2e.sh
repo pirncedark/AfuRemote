@@ -41,5 +41,19 @@ wait_log 15 "AfuRemotePlayer: state=PAUSED" || fail "video did not pause"; echo 
 code=$(api POST /v1/key '{"key":"back"}'); [ "$code" = 200 ] || fail "back returned $code"; sleep 3
 adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" | grep -q PlayerActivity && fail "back did not close player"
 echo "OK 7: back button"
+# 8) phone mode discovers the TV on the same emulator
+adb shell am start -n "$PKG/.MainActivity" --es mode phone >/dev/null
+MODEL=$(adb shell getprop ro.product.model | tr -d '\r')
+wait_text 40 "$MODEL" phone_home || fail "TV was not discovered in phone mode (model: $MODEL)"
+echo "OK 8: TV discovered"
+
+# 9) share a link into AfuRemote, approve pairing on TV, and play on TV
+adb logcat -c
+adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "Film: $MP4" -n "$PKG/.phone.ShareActivity" >/dev/null
+wait_text 40 "İzin ver" share_pair || fail "pair prompt did not appear during share"
+tap_text share_pair "İzin ver" || fail "pair approval button was not found during share"
+wait_log 60 "AfuRemotePlayer: state=PLAYING" || fail "shared link did not play on TV"
+echo "OK 9: shared link opened on TV"
+
 grep -q "FATAL EXCEPTION" "$OUT/tam.log" && fail "crash detected"
 adb exec-out screencap -p > "$OUT/son.png"; echo "BASARILI: all steps passed"

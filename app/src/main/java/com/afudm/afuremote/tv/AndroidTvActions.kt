@@ -31,7 +31,7 @@ class AndroidTvActions(private val context: Context, private val store: PairingS
         }
         return when (launch(intent)) {
             LaunchResult.OK -> ApiResult(true)
-            LaunchResult.NO_APP -> ApiResult(false, "uygulama_bulunamadi")
+            LaunchResult.NO_APP -> ApiResult(false, "acacak_uygulama_yok")
             LaunchResult.NOT_ALLOWED -> accessibilityError()
         }
     }
