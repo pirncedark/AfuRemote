@@ -3,6 +3,7 @@ package com.afudm.afuremote.phone
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -98,13 +99,15 @@ class ShareActivity : ComponentActivity() {
     }
 
     private fun parse(intent: Intent?): Shared? {
+        Log.i(TAG, "share intent action=${intent?.action} type=${intent?.type} extras=${intent?.extras?.keySet()}")
         if (intent?.action != Intent.ACTION_SEND) return null
         val type = intent.type.orEmpty()
         if (type.startsWith("video/")) {
             return IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)?.let { Shared.LocalVideo(it) }
         }
-        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
-        val url = LinkClassifier.extractUrl(text) ?: return null
+        val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() ?: return null
+        val url = LinkClassifier.extractUrl(text) ?: run { Log.w(TAG, "share text present (${text.length} chars) but has no URL"); return null }
+        Log.i(TAG, "share link extracted")
         return Shared.Link(url, intent.getStringExtra(Intent.EXTRA_SUBJECT).orEmpty())
     }
 
@@ -112,4 +115,6 @@ class ShareActivity : ComponentActivity() {
         if (::graph.isInitialized && discoveryAcquired) graph.discovery.release()
         super.onDestroy()
     }
+
+    private companion object { const val TAG = "AfuRemoteShare" }
 }
