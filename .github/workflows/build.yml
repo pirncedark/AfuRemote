@@ -1,0 +1,42 @@
+name: Build AfuRemote
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+      - name: Install Gradle & generate wrapper
+        run: |
+          GRADLE_VERSION="9.6.0"
+          wget -q "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -O /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp/
+          export PATH="/tmp/gradle-${GRADLE_VERSION}/bin:$PATH"
+          gradle wrapper --gradle-version ${GRADLE_VERSION} --distribution-type bin
+          chmod +x gradlew
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Unit tests + debug APK
+        run: ./gradlew test assembleDebug --no-daemon --stacktrace
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: AfuRemote-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          retention-days: 7
