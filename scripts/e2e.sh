@@ -70,5 +70,38 @@ tap_text share_pair "İzin ver" || fail "pair approval button was not found duri
 wait_log 60 "AfuRemotePlayer: state=PLAYING" || fail "shared link did not play on TV"
 echo "OK 9: shared link opened on TV"
 
+# 10) Download and open the in-app update installer.
+adb shell am start -n "$PKG/.MainActivity" >/dev/null
+wait_text 40 "Güncellemeleri denetle" update_check || fail "update check button did not appear"
+tap_text update_check "Güncellemeleri denetle" || fail "update check button was not found"
+if ! wait_text 30 "Yeni AfuRemote sürümü: 0.1.0" update_dialog; then
+  dump update_rate_limit
+  if grep -Eqi 'GitHub 403|rate limit' "$OUT/update_rate_limit.xml"; then
+    echo "SKIP 10: GitHub rate limit"
+    exit 0
+  fi
+  fail "new version 0.1.0 was not found"
+fi
+tap_text update_dialog "İndir ve kur" || fail "download button was not found"
+installer_open=0
+for _ in $(seq 1 90); do
+  dump update_progress
+  if grep -q 'text="Kur"' "$OUT/update_progress.xml"; then
+    tap_text update_progress "Kur" || fail "Kur button was not selectable"
+  fi
+  activity=$(adb shell dumpsys activity activities)
+  if printf '%s' "$activity" | grep -Eqi 'com\.google\.android\.packageinstaller|com\.android\.packageinstaller|UNKNOWN_APP_SOURCES|ManageAppExternalSources'; then
+    installer_open=1
+    break
+  fi
+  if grep -Eqi 'GitHub 403|rate limit' "$OUT/update_progress.xml"; then
+    echo "SKIP 10: GitHub rate limit"
+    exit 0
+  fi
+  sleep 2
+done
+[ "$installer_open" = 1 ] || fail "installer or unknown sources settings did not open within 180 seconds"
+echo "OK 10: in-app update reaches installer"
+adb shell input keyevent BACK
 grep -q "FATAL EXCEPTION" "$OUT/tam.log" && fail "crash detected"
 adb exec-out screencap -p > "$OUT/son.png"; echo "BASARILI: all steps passed"

@@ -1,6 +1,7 @@
 package com.afudm.afuremote.update
 
 import android.content.Context
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -32,8 +33,19 @@ object UpdateManager {
     fun markChecked(context: Context) = prefs(context).edit().putLong(LAST_CHECK, System.currentTimeMillis()).apply()
 
     fun enqueueDownload(context: Context, update: AppUpdate) {
+        val data = workDataOf(
+            ApkDownloadWorker.KEY_APK to update.apkUrl,
+            ApkDownloadWorker.KEY_SHA to update.checksumUrl,
+            ApkDownloadWorker.KEY_VERSION_CODE to update.versionCode
+        )
+        enqueueDownload(context, data)
+    }
+
+    fun retryDownload(context: Context, input: Data) = enqueueDownload(context, input)
+
+    private fun enqueueDownload(context: Context, input: Data) {
         val request = OneTimeWorkRequestBuilder<ApkDownloadWorker>()
-            .setInputData(workDataOf(ApkDownloadWorker.KEY_APK to update.apkUrl, ApkDownloadWorker.KEY_SHA to update.checksumUrl))
+            .setInputData(input)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork("afuremote_update", ExistingWorkPolicy.REPLACE, request)
     }
