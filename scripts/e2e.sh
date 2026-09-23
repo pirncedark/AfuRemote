@@ -16,6 +16,9 @@ adb shell settings put secure enabled_accessibility_services "$PKG/$PKG.tv.Remot
 adb shell settings put secure accessibility_enabled 1
 adb logcat -c; adb logcat -v time > "$OUT/tam.log" &
 adb shell am start -n "$PKG/.MainActivity" --es mode tv >/dev/null
+# The debug build (versionCode 1) sees the published release; close the automatic update prompt if it appears.
+dismiss_update() { local name=$1; dump "$name"; if grep -q "Yeni AfuRemote sürümü" "$OUT/$name.xml"; then tap_text "$name" "Sonra" || fail "update prompt could not be closed"; sleep 1; fi; }
+for _ in $(seq 1 10); do dump tv_start; if grep -q "Yeni AfuRemote sürümü" "$OUT/tv_start.xml"; then dismiss_update tv_start; break; fi; sleep 2; done
 wait_text 60 "AfuRemote TV" tv_home || fail "TV home screen did not appear"
 adb forward tcp:9870 tcp:9870 >/dev/null
 code=""; for _ in $(seq 1 15); do code=$(api GET /v1/info); [ "$code" = 200 ] && break; sleep 2; done

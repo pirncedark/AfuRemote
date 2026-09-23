@@ -127,7 +127,7 @@ fun UpdateSection(versionCode: Int, versionName: String) {
         AlertDialog(
             onDismissRequest = { found = null },
             title = { Text("Yeni AfuRemote sürümü: ${update.versionName}") },
-            text = { Text(update.releaseNotes.take(400).ifBlank { "Hata düzeltmeleri ve iyileştirmeler." }) },
+            text = { Text(ReleaseNotes.forDisplay(update.releaseNotes).take(400).ifBlank { "Hata düzeltmeleri ve iyileştirmeler." }) },
             confirmButton = {
                 TextButton(onClick = {
                     found = null
