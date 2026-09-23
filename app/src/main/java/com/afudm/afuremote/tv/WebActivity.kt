@@ -18,7 +18,7 @@ class WebActivity : ComponentActivity() {
         val url = intent.getStringExtra(EXTRA_URL) ?: run { finish(); return }
         setContent {
             BackHandler(enabled = webView?.canGoBack() == true) { webView?.goBack() }
-            AndroidView(Modifier.fillMaxSize(), factory = { context ->
+            AndroidView(factory = { context ->
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
@@ -28,7 +28,7 @@ class WebActivity : ComponentActivity() {
                     loadUrl(url)
                     webView = this
                 }
-            })
+            }, modifier = Modifier.fillMaxSize())
         }
     }
     override fun onDestroy() { webView?.destroy(); webView = null; super.onDestroy() }
