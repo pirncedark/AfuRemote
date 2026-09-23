@@ -50,6 +50,14 @@ echo "OK 8: TV discovered"
 # 9) share a link into AfuRemote, approve pairing on TV, and play on TV
 adb logcat -c
 adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "Film: $MP4" -n "$PKG/.phone.ShareActivity" >/dev/null
+sleep 2
+dump share_launch
+# Some emulator images display Android's target picker even for a component-qualified SEND intent.
+if grep -q 'resource-id="android:id/resolver_list"' "$OUT/share_launch.xml"; then
+  tap_text share_launch "AfuRemote" || fail "AfuRemote share target not found"
+  dump share_choice
+  grep -q 'text="Just once"' "$OUT/share_choice.xml" && tap_text share_choice "Just once"
+fi
 wait_text 40 "İzin ver" share_pair || fail "pair prompt did not appear during share"
 tap_text share_pair "İzin ver" || fail "pair approval button was not found during share"
 wait_log 60 "AfuRemotePlayer: state=PLAYING" || fail "shared link did not play on TV"
