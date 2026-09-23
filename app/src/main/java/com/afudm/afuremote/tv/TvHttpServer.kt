@@ -6,13 +6,18 @@ import kotlinx.coroutines.runBlocking
 
 class TvHttpServer(private val router: TvRouter) : NanoHTTPD(PORT) {
     override fun serve(session: IHTTPSession): Response {
-        val body = if (session.method == Method.POST) runCatching {
+        val body = if (session.method == Method.POST) {
+            val contentLength = session.headers["content-length"]?.toLongOrNull()
+                ?: return badRequest()
+            if (contentLength !in 0..MAX_BODY.toLong()) return badRequest()
+            runCatching {
             val files = HashMap<String, String>()
             session.parseBody(files)
-            files["postData"].orEmpty().take(MAX_BODY + 1).also {
+            files["postData"].orEmpty().also {
                 if (it.toByteArray().size > MAX_BODY) throw IllegalArgumentException("body too large")
             }
-            }.getOrElse { return newFixedLengthResponse(Response.Status.BAD_REQUEST, JSON, "{\"ok\":false,\"hata\":\"bozuk_istek\"}") } else ""
+            }.getOrElse { return badRequest() }
+        } else ""
         val token = session.headers[TOKEN_HEADER.lowercase()]
         val routed = runCatching { runBlocking { router.handle(session.method.name, session.uri, token, body) } }
             .getOrElse { return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, JSON, "{\"ok\":false,\"hata\":\"sunucu_hatasi\"}") }
@@ -27,6 +32,8 @@ class TvHttpServer(private val router: TvRouter) : NanoHTTPD(PORT) {
         }
         return newFixedLengthResponse(status, JSON, routed.body)
     }
+
+    private fun badRequest() = newFixedLengthResponse(Response.Status.BAD_REQUEST, JSON, "{\"ok\":false,\"hata\":\"bozuk_istek\"}")
 
     companion object { private const val PORT = 9870; private const val MAX_BODY = 64 * 1024; private const val JSON = "application/json" }
 }

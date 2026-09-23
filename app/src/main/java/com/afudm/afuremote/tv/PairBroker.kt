@@ -8,11 +8,13 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 
 object PairBroker {
-    private val pending = java.util.concurrent.ConcurrentHashMap<String, CompletableDeferred<PairDecision>>()
+    private data class Pending(val deviceId: String, val answer: CompletableDeferred<PairDecision>)
+    private val pending = java.util.concurrent.atomic.AtomicReference<Pending?>(null)
 
     suspend fun request(context: Context, deviceId: String, deviceName: String): PairDecision {
         val answer = CompletableDeferred<PairDecision>()
-        if (pending.putIfAbsent(deviceId, answer) != null) return PairDecision.CANNOT_PROMPT
+        val request = Pending(deviceId, answer)
+        if (!pending.compareAndSet(null, request)) return PairDecision.CANNOT_PROMPT
         return try {
             val intent = Intent(context, PairPromptActivity::class.java)
                 .putExtra(PairPromptActivity.EXTRA_DEVICE_ID, deviceId)
@@ -25,11 +27,12 @@ object PairBroker {
                 return PairDecision.CANNOT_PROMPT
             }
             withTimeoutOrNull(TIMEOUT_MS) { answer.await() } ?: PairDecision.DENIED
-        } finally { pending.remove(deviceId, answer) }
+        } finally { pending.compareAndSet(request, null) }
     }
 
     fun decide(deviceId: String, approved: Boolean) {
-        pending[deviceId]?.complete(if (approved) PairDecision.APPROVED else PairDecision.DENIED)
+        pending.get()?.takeIf { it.deviceId == deviceId }?.answer
+            ?.complete(if (approved) PairDecision.APPROVED else PairDecision.DENIED)
     }
     private const val TIMEOUT_MS = 60_000L
     private const val TAG = "AfuRemotePair"

@@ -73,6 +73,12 @@ class TvRouterTest {
     }
 
     @Test
+    fun `pair requests with invalid identity are rejected before prompting`() {
+        assertEquals(400, call("POST", "/v1/pair", body = """{"deviceName":"  ","deviceId":"d1"}""").status)
+        assertEquals(400, call("POST", "/v1/pair", body = """{"deviceName":"Tel","deviceId":"bad/id"}""").status)
+    }
+
+    @Test
     fun `open classifies the link and forceMedia overrides it`() {
         val token = pair()
         assertEquals(200, call("POST", "/v1/open", token, """{"url":"https://x.com/a.mp4"}""").status)

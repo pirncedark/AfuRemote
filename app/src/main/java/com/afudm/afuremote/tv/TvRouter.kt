@@ -48,7 +48,11 @@ class TvRouter(
         else key(ProtocolJson.decodeFromString<KeyRequest>(body))
     }
 
-    private suspend fun pair(req: PairRequest): RouterResponse = when (actions.askPairApproval(req)) {
+    private suspend fun pair(req: PairRequest): RouterResponse {
+        if (!req.deviceId.matches(Regex("[A-Za-z0-9._:-]{1,64}")) ||
+            req.deviceName.trim().length !in 1..48
+        ) return error(400, "bozuk_istek")
+        return when (actions.askPairApproval(req)) {
         PairDecision.APPROVED -> {
             val issuedToken = registry.issue(req.deviceId)
             onPairingsChanged(registry.snapshot())
@@ -56,6 +60,7 @@ class TvRouter(
         }
         PairDecision.DENIED -> error(403, "reddedildi")
         PairDecision.CANNOT_PROMPT -> error(409, HATA_ERISILEBILIRLIK)
+        }
     }
 
     private fun open(req: OpenRequest): RouterResponse {
