@@ -54,4 +54,11 @@ class UpdateParserTest {
         assertFalse(Sha256.verify(f, "0".repeat(64)))
         f.delete()
     }
+
+    @Test
+    fun `release notes show the Turkish part without markdown`() {
+        val body = "# AfuRemote v1\n\nEnglish text\n\n---\n\n## Türkçe\n**Kalın** metin\n\n## Kurulum\n`AfuRemote-universal.apk` kurun."
+        assertEquals("Kalın metin\n\nKurulum\nAfuRemote-universal.apk kurun.", ReleaseNotes.forDisplay(body))
+        assertEquals("Only English", ReleaseNotes.forDisplay("## Only English"))
+    }
 }

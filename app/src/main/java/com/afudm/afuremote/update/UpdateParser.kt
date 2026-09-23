@@ -45,6 +45,20 @@ object UpdateParser {
     }
 }
 
+object ReleaseNotes {
+    /** Turkish part of a bilingual release body, as plain text for the update dialog. */
+    fun forDisplay(body: String): String {
+        val turkish = body.substringAfter("## Türkçe", missingDelimiterValue = body)
+        return turkish.lines()
+            .map { it.trim() }
+            .filter { it != "---" }
+            .map { it.trimStart('#', ' ').replace("**", "").replace("`", "") }
+            .joinToString("\n")
+            .replace(Regex("\n{3,}"), "\n\n")
+            .trim()
+    }
+}
+
 object Sha256 {
     fun verify(file: File, expectedText: String): Boolean {
         val digest = MessageDigest.getInstance("SHA-256")
