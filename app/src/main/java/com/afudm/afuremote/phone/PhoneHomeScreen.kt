@@ -19,6 +19,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -59,6 +60,9 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
     var settings by remember { mutableStateOf(false) }
     var textDialog by remember { mutableStateOf(false) }
     var linkDialog by remember { mutableStateOf(false) }
+    var ipDialog by remember { mutableStateOf(false) }
+    var manualIp by remember { mutableStateOf("") }
+    var ipError by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
@@ -120,6 +124,7 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
                 scanning = scanning,
                 onSelect = ::select,
                 onRefresh = { graph.discovery.refresh() },
+                onAddIp = { ipDialog = true; ipError = "" },
                 onClose = { picker = false }
             )
             BackHandler { picker = false }
@@ -130,6 +135,26 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
             }
             BackHandler { settings = false }
         }
+    }
+
+    if (ipDialog) {
+        AlertDialog(
+            onDismissRequest = { ipDialog = false },
+            title = { Text("TV'yi IP ile ekle") },
+            text = { Column {
+                Text("TV ekranındaki IP adresini girin. Port: 9870")
+                OutlinedTextField(value = manualIp, onValueChange = { manualIp = it; ipError = "" }, label = { Text("TV IP adresi") }, singleLine = true)
+                if (ipError.isNotBlank()) Text(ipError, color = RemoteColors.Offline)
+            } },
+            confirmButton = { TextButton(onClick = {
+                scope.launch {
+                    val found = graph.discovery.addManually(manualIp)
+                    if (found == null) ipError = "TV'ye bağlanılamadı. IP adresini ve TV uygulamasının açık olduğunu kontrol edin."
+                    else { select(found); ipDialog = false }
+                }
+            }) { Text("Bağlan") } },
+            dismissButton = { TextButton(onClick = { ipDialog = false }) { Text("Vazgeç") } }
+        )
     }
 
     if (textDialog) {

@@ -5,8 +5,10 @@ import kotlinx.serialization.json.Json
 
 const val PROTOCOL_VERSION = "v1"
 const val TV_PORT = 9870
+const val DISCOVERY_UDP_PORT = 9872
+const val DISCOVERY_QUERY = "AFUREMOTE_DISCOVER_V1"
 const val PHONE_MEDIA_PORT = 9871
-const val SERVICE_TYPE = "_afuremote._tcp"
+const val SERVICE_TYPE = "_afuremote._tcp."
 const val DEVICE_HEADER = "X-Afu-Device"
 const val TIME_HEADER = "X-Afu-Time"
 const val NONCE_HEADER = "X-Afu-Nonce"
