@@ -1,9 +1,12 @@
 package com.afudm.afuremote.ui
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 val AfuPurple = Color(0xFF7C5CFF)
 
@@ -25,5 +28,26 @@ object RemoteColors {
 
 @Composable
 fun AfuTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = darkColorScheme(primary = AfuPurple, background = Color(0xFF110E1C), surface = Color(0xFF1B1530)), content = content)
+    // Kumanda görselindeki koyu gri tema: nötr yüzeyler, mor vurgu, açık gri yazı.
+    val scheme = darkColorScheme(
+        primary = RemoteColors.RingStart,
+        onPrimary = Color.White,
+        secondary = RemoteColors.RingEnd,
+        onSecondary = Color.White,
+        background = RemoteColors.Background,
+        onBackground = RemoteColors.Text,
+        surface = RemoteColors.Background,
+        onSurface = RemoteColors.Text,
+        surfaceVariant = RemoteColors.Button,
+        onSurfaceVariant = RemoteColors.Muted,
+        surfaceContainerLowest = RemoteColors.Background,
+        surfaceContainerLow = RemoteColors.Pad,
+        surfaceContainer = RemoteColors.Pad,
+        surfaceContainerHigh = RemoteColors.Pad,
+        surfaceContainerHighest = RemoteColors.Button,
+        outline = Color(0xFF5A5A5A),
+        outlineVariant = Color(0xFF3A3A3A),
+        error = RemoteColors.Offline
+    )
+    MaterialTheme(colorScheme = scheme, shapes = Shapes(extraLarge = RoundedCornerShape(28.dp)), content = content)
 }

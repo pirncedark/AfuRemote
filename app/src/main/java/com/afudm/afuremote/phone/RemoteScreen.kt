@@ -69,7 +69,7 @@ private val APPS = listOf(
 
 @Composable
 fun RemoteScreen(
-    tv: TvDevice,
+    tv: TvDevice?,
     online: Boolean,
     status: String,
     onKey: (RemoteKey) -> Unit,
@@ -95,7 +95,7 @@ fun RemoteScreen(
             ) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(if (online) RemoteColors.Online else RemoteColors.Offline))
                 Spacer(Modifier.width(10.dp))
-                Text(tv.name, color = RemoteColors.Text, fontSize = 22.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(tv?.name ?: "TV seçin", color = RemoteColors.Text, fontSize = 22.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 Spacer(Modifier.width(10.dp))
                 GlyphIcon(Glyph.CARET, size = 18.dp)
             }

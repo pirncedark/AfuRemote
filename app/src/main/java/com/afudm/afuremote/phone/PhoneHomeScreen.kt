@@ -2,6 +2,7 @@ package com.afudm.afuremote.phone
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -83,7 +85,8 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
     }
 
     fun send(quiet: Boolean = true, block: suspend (TvDevice) -> SendResult) {
-        val tv = current ?: run { status = Messages.NO_TV; return }
+        // TV seçilmeden bir tuşa basılırsa seçici açılır.
+        val tv = current ?: run { picker = true; return }
         scope.launch {
             if (!quiet) status = "Gönderiliyor…"
             val r = block(tv)
@@ -98,10 +101,10 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
 
     val tv = current
     Box(Modifier.fillMaxSize().background(RemoteColors.Background)) {
-        if (tv != null) {
-            RemoteScreen(
+        // Kumanda hep altta durur; geri tuşu seçiciyi/ayarları kapatıp buraya döner.
+        RemoteScreen(
                 tv = tv,
-                online = devices.any { it.id == tv.id },
+                online = tv != null && devices.any { it.id == tv.id },
                 status = status,
                 onKey = { k -> send { graph.controller.key(it, k, onPairing) } },
                 onLaunch = { pkg -> send { graph.controller.launch(it, pkg, onPairing) } },
@@ -110,18 +113,16 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
                 onPickTv = { picker = true },
                 onSettings = { settings = true }
             )
-        }
-        if (picker || tv == null) {
+        if (picker) {
             DiscoveryScreen(
                 devices = devices,
                 selectedId = tv?.id,
                 scanning = scanning,
                 onSelect = ::select,
                 onRefresh = { graph.discovery.refresh() },
-                onSettings = { settings = true },
-                onClose = if (tv != null) ({ picker = false }) else null
+                onClose = { picker = false }
             )
-            if (tv != null) BackHandler { picker = false }
+            BackHandler { picker = false }
         }
         if (settings) {
             SettingsPage(versionName, onModeChange, footer, onClose = { settings = false }) { url ->
@@ -190,21 +191,35 @@ private fun SettingsPage(
             .padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Ayarlar", color = RemoteColors.Text, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            RoundTap(Glyph.CLOSE, "Kapat", onClose, size = 26)
+        Row(Modifier.fillMaxWidth().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.weight(1f))
+            RoundTap(Glyph.CLOSE, "Kapat", onClose)
         }
-        footer()
-        Text("Link gönder", color = RemoteColors.Muted, fontSize = 14.sp)
-        SendField("Link", link, { link = it; error = "" }) {}
-        if (error.isNotBlank()) Text(error, color = RemoteColors.Offline, fontSize = 13.sp)
-        Button(onClick = {
-            val url = LinkClassifier.extractUrl(link) ?: run { error = "Geçerli bir link yazın"; return@Button }
-            onOpenLink(url)
-            onClose()
-        }, modifier = Modifier.fillMaxWidth()) { Text("TV'de aç") }
-        ModeSection(onModeChange)
+        Text("ayarlar", color = RemoteColors.Text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
+        SettingsCard("Güncelleme") { footer() }
+        SettingsCard("Link gönder") {
+            SendField("Link", link, { link = it; error = "" }) {}
+            if (error.isNotBlank()) Text(error, color = RemoteColors.Offline, fontSize = 13.sp)
+            Button(onClick = {
+                val url = LinkClassifier.extractUrl(link) ?: run { error = "Geçerli bir link yazın"; return@Button }
+                onOpenLink(url)
+                onClose()
+            }, modifier = Modifier.fillMaxWidth()) { Text("TV'de aç") }
+        }
+        SettingsCard(null) { ModeSection(onModeChange) }
         Text("AfuRemote $versionName", color = RemoteColors.Muted, fontSize = 13.sp)
         Spacer(Modifier.padding(bottom = 24.dp))
+    }
+}
+
+/** Ayarlar sayfasındaki yuvarlak köşeli koyu gri bölüm. */
+@Composable
+private fun SettingsCard(title: String?, content: @Composable () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(RemoteColors.Pad).padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (title != null) Text(title, color = RemoteColors.Muted, fontSize = 14.sp)
+        content()
     }
 }
