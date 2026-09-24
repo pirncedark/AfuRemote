@@ -30,6 +30,28 @@ object UpdateParser {
             .maxByOrNull { it.versionCode }
             ?.takeIf { it.versionCode > currentVersionCode }
 
+    /** Parse the quota-free asset manifest published alongside each current release. */
+    fun manifest(json: String, currentVersionCode: Int): AppUpdate? = runCatching {
+        val o = ProtocolJson.parseToJsonElement(json).jsonObject
+        val version = o["versionName"]?.jsonPrimitive?.contentOrNull ?: return null
+        val versionCode = o["versionCode"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: return null
+        val tag = o["tag"]?.jsonPrimitive?.contentOrNull ?: return null
+        val apk = o["apk"]?.jsonPrimitive?.contentOrNull ?: return null
+        val sha = o["sha256"]?.jsonPrimitive?.contentOrNull ?: return null
+        val notes = o["changelog"]?.jsonPrimitive?.contentOrNull ?: ""
+        if (TAG.matchEntire(tag)?.groupValues?.get(1) != version || AppVersion.code(version) != versionCode ||
+            apk != APK || !sha.matches(Regex("(?i)[0-9a-f]{64}")) || versionCode <= currentVersionCode) return null
+        val base = "https://github.com/pirncedark/AfuRemote/releases/download/$tag/"
+        AppUpdate(version, versionCode, notes, base + APK, base + "$APK.sha256")
+    }.getOrNull()
+
+    /** Prefer a valid manifest result, otherwise use the legacy releases API result. */
+    internal fun manifestOrLegacy(manifest: String?, legacy: String?, currentVersionCode: Int): AppUpdate? {
+        val parsed = manifest?.let { manifest(it, -1) }
+        if (parsed != null) return parsed.takeIf { it.versionCode > currentVersionCode }
+        return legacy?.let { latest(it, currentVersionCode) }
+    }
+
     private fun toUpdate(o: JsonObject): AppUpdate? {
         if (o["prerelease"]?.jsonPrimitive?.booleanOrNull == true) return null
         if (o["draft"]?.jsonPrimitive?.booleanOrNull == true) return null

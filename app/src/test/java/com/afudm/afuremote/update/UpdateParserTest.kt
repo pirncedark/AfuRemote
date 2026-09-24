@@ -40,6 +40,34 @@ class UpdateParserTest {
     }
 
     @Test
+    fun `manifest resolves tagged apk and checksum addresses`() {
+        val manifest = """{"versionName":"0.2.1","versionCode":2001,"tag":"afuremote-v0.2.1","apk":"AfuRemote-universal.apk","sha256":"${"a".repeat(64)}","changelog":"Düzeltmeler"}"""
+        val update = UpdateParser.manifest(manifest, AppVersion.code("0.2.0"))
+        assertEquals("https://github.com/pirncedark/AfuRemote/releases/download/afuremote-v0.2.1/AfuRemote-universal.apk", update?.apkUrl)
+        assertEquals("https://github.com/pirncedark/AfuRemote/releases/download/afuremote-v0.2.1/AfuRemote-universal.apk.sha256", update?.checksumUrl)
+        assertEquals("Düzeltmeler", update?.releaseNotes)
+    }
+
+    @Test
+    fun `missing or malformed manifest falls back to legacy api`() {
+        val legacy = "[${release("afuremote-v0.2.1")}]"
+        assertEquals("0.2.1", UpdateParser.manifestOrLegacy(null, legacy, AppVersion.code("0.2.0"))?.versionName)
+        assertEquals("0.2.1", UpdateParser.manifestOrLegacy("{bad", legacy, AppVersion.code("0.2.0"))?.versionName)
+    }
+
+    @Test
+    fun `same or older manifest is not an update and rate limit message is localized`() {
+        val manifest = """{"versionName":"0.2.1","versionCode":2001,"tag":"afuremote-v0.2.1","apk":"AfuRemote-universal.apk","sha256":"${"b".repeat(64)}","changelog":""}"""
+        assertNull(UpdateParser.manifest(manifest, 2001))
+        assertNull(UpdateParser.manifest(manifest, 3000))
+        assertNull(UpdateParser.manifestOrLegacy(manifest, "[${release("afuremote-v0.1.0")}]", 2001))
+        assertEquals("GitHub \u015fu an yo\u011fun, birka\u00e7 dakika sonra tekrar dene.", UpdateManager.statusException(403).localizedMessage)
+        assertEquals(UpdateManager.statusException(403).localizedMessage, UpdateManager.statusException(429).localizedMessage)
+        assertTrue(UpdateManager.shouldFallbackToApi(404))
+        assertFalse(UpdateManager.shouldFallbackToApi(403))
+    }
+
+    @Test
     fun `version codes order numerically`() {
         assertEquals(1_002_003, AppVersion.code("1.2.3"))
         assertEquals(1_002_003, AppVersion.code("1.2.3-test"))
