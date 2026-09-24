@@ -11,6 +11,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.cancel
 import com.afudm.afuremote.R
 import com.afudm.afuremote.pairing.PairingStore
 import com.afudm.afuremote.pairing.TokenRegistry
@@ -19,8 +20,10 @@ import fi.iki.elonen.NanoHTTPD
 import java.io.IOException
 
 class AfuTvService : Service() {
+    private val serviceScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
     private var server: TvHttpServer? = null
     private var advertiser: NsdAdvertiser? = null
+    private var udpDiscovery: UdpDiscoveryResponder? = null
     private var registry: TokenRegistry? = null
     private lateinit var store: PairingStore
 
@@ -41,7 +44,9 @@ class AfuTvService : Service() {
         catch (e: IOException) { Log.e(TAG, "TV sunucusu acilamadi", e); null }
         if (server != null) {
             Log.i(TAG, "TV sunucusu hazir: port $TV_PORT")
-            advertiser = NsdAdvertiser(this).also { it.register("AfuRemote ${actions.deviceName()}".take(60)) }
+            val name = "AfuRemote ${actions.deviceName()}".take(60)
+            advertiser = NsdAdvertiser(this).also { it.register(name) }
+            udpDiscovery = UdpDiscoveryResponder(name, store.deviceId()).also { it.start(serviceScope) }
         }
     }
 
@@ -58,7 +63,7 @@ class AfuTvService : Service() {
         else startForeground(NOTIFICATION_ID, notification)
     }
 
-    override fun onDestroy() { advertiser?.unregister(); server?.stop(); super.onDestroy() }
+    override fun onDestroy() { udpDiscovery?.stop(); advertiser?.unregister(); server?.stop(); serviceScope.cancel(); super.onDestroy() }
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {

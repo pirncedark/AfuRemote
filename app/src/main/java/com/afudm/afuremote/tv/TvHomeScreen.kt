@@ -33,7 +33,7 @@ fun TvHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer: @
     Column(Modifier.fillMaxSize().padding(32.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("AfuRemote TV hazır", fontSize = 30.sp)
         Text("Telefonda AfuRemote'u açın — bu TV listede kendiliğinden görünür.", fontSize = 18.sp)
-        Text("Adres: $ip   ·   Sürüm $versionName")
+        Text("Adres: $ip:9870   ·   Sürüm $versionName")
         Text(if (accessibilityOn) "Erişilebilirlik: açık ✓" else "Erişilebilirlik: KAPALI — geri/ana ekran tuşları ve AfuRemote kapalıyken link açma için bir kez açın.", fontSize = 16.sp)
         if (!accessibilityOn) Button(onClick = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }) { Text("Erişilebilirlik ayarlarını aç") }
         OutlinedButton(onClick = { AfuTvService.resetPairings(context) }) { Text("Telefon onaylarını sıfırla") }

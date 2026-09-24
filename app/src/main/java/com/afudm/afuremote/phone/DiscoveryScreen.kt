@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -51,6 +52,7 @@ fun DiscoveryScreen(
     scanning: Boolean,
     onSelect: (TvDevice) -> Unit,
     onRefresh: () -> Unit,
+    onAddIp: () -> Unit,
     onClose: () -> Unit
 ) {
     Box(Modifier.fillMaxSize().background(Color(0xFF232323))) {
@@ -93,6 +95,7 @@ fun DiscoveryScreen(
                 Spacer(Modifier.width(10.dp))
                 Text(if (scanning) "Aranıyor…" else "Yenile", color = RemoteColors.Text, fontSize = 15.sp)
             }
+            TextButton(onClick = onAddIp, modifier = Modifier.padding(top = 4.dp)) { Text("TV'yi bulamadım → IP ile ekle", color = RemoteColors.Text) }
             Spacer(Modifier.height(40.dp))
         }
     }

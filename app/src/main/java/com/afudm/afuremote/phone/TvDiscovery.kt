@@ -10,12 +10,17 @@ import com.afudm.afuremote.net.LocalIp
 import com.afudm.afuremote.net.Subnet
 import com.afudm.afuremote.protocol.SERVICE_TYPE
 import com.afudm.afuremote.protocol.TV_PORT
+import com.afudm.afuremote.protocol.DISCOVERY_QUERY
+import com.afudm.afuremote.protocol.DISCOVERY_UDP_PORT
+import com.afudm.afuremote.protocol.UdpDiscovery
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,10 +33,12 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
-import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.Inet4Address
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
@@ -73,13 +80,14 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
         multicast = runCatching {
             app.getSystemService(WifiManager::class.java)?.createMulticastLock("afuremote-bulma")?.apply { setReferenceCounted(false); acquire() }
         }.getOrNull()
+        // Acquire before discoverServices: multicast packets can arrive immediately.
         startNsd()
         job = scope.launch {
             _scanning.value = true
             known.all().forEach { tv -> launch { verify(tv.host, tv.port, "") } }
             _devices.value.forEach { tv -> launch { verify(tv.host, tv.port, tv.serviceName) } }
             delay(NSD_GRACE_MS)
-            if (forceScan || _devices.value.isEmpty()) scanSubnet()
+            if (forceScan || _devices.value.isEmpty()) { scanUdp(); if (_devices.value.isEmpty()) scanSubnet() }
             _scanning.value = false
             while (isActive) {
                 delay(HEARTBEAT_MS)
@@ -125,6 +133,43 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
         }
     }
 
+    suspend fun addManually(host: String, port: Int = TV_PORT): TvDevice? = withContext(Dispatchers.IO) {
+        val clean = host.trim().removePrefix("[").removeSuffix("]")
+        if (clean.isBlank() || port !in 1..65535) return@withContext null
+        val info = probe.info(clean, port) ?: client.info(clean, port) ?: return@withContext null
+        val device = TvDevice(info.id, info.name, info.model, clean, port, "")
+        known.remember(device)
+        _devices.update { list -> list.filterNot { it.id == device.id } + device }
+        device
+    }
+
+    private suspend fun scanUdp() {
+        val lan = LocalIp.lan() ?: return
+        val parts = lan.ip.split('.').mapNotNull(String::toIntOrNull)
+        if (parts.size != 4) return
+        val bits = lan.prefix.coerceIn(1, 30)
+        val ip = parts.fold(0L) { a, b -> (a shl 8) or b.toLong() }
+        val mask = (0xFFFFFFFFL shl (32 - bits)) and 0xFFFFFFFFL
+        val broadcast = (ip and mask) or (mask.inv() and 0xFFFFFFFFL)
+        val targets = listOf("255.255.255.255", listOf(24,16,8,0).joinToString(".") { ((broadcast shr it) and 255).toString() }).distinct()
+        runCatching {
+            DatagramSocket().use { socket ->
+                socket.broadcast = true
+                socket.soTimeout = 300
+                val query = DISCOVERY_QUERY.toByteArray(Charsets.UTF_8)
+                targets.forEach { host -> socket.send(DatagramPacket(query, query.size, InetAddress.getByName(host), DISCOVERY_UDP_PORT)) }
+                val started = System.nanoTime()
+                val seen = linkedSetOf<String>()
+                while (!UdpDiscovery.timedOut(started, System.nanoTime(), UDP_WAIT_MS * 1_000_000)) {
+                    val packet = DatagramPacket(ByteArray(512), 512)
+                    try { socket.receive(packet) } catch (_: java.net.SocketTimeoutException) { continue }
+                    val reply = UdpDiscovery.parse(String(packet.data, packet.offset, packet.length, Charsets.UTF_8)) ?: continue
+                    if (seen.add(reply.id)) verify(packet.address.hostAddress ?: continue, reply.port, "")
+                }
+            }
+        }
+    }
+
     private fun portOpen(host: String): Boolean = runCatching {
         Socket().use { it.connect(InetSocketAddress(host, TV_PORT), SCAN_CONNECT_MS) }
         true
@@ -161,7 +206,7 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
     }
 
     private suspend fun resolveAndVerify(service: NsdServiceInfo) {
-        val resolved = resolveLock.withLock { resolve(service) } ?: return
+        val resolved = withTimeoutOrNull(RESOLVE_TIMEOUT_MS) { resolveLock.withLock { resolve(service) } } ?: return
         val host = pickHost(resolved) ?: return
         verify(host, resolved.port, service.serviceName)
     }
@@ -186,5 +231,7 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
         const val HEARTBEAT_MS = 8_000L
         const val SCAN_PARALLEL = 48
         const val SCAN_CONNECT_MS = 350
+        const val UDP_WAIT_MS = 1_200L
+        const val RESOLVE_TIMEOUT_MS = 4_000L
     }
 }
