@@ -21,6 +21,7 @@ import com.afudm.afuremote.ui.AfuTheme
 import com.afudm.afuremote.tv.AfuTvService
 import com.afudm.afuremote.tv.TvHomeScreen
 import com.afudm.afuremote.phone.PhoneHomeScreen
+import com.afudm.afuremote.phone.PhonePermissionGate
 import com.afudm.afuremote.update.AutoUpdater
 import com.afudm.afuremote.update.UpdateSection
 import com.afudm.afuremote.update.UpdateState
@@ -41,7 +42,7 @@ class MainActivity : ComponentActivity() {
                 Surface(Modifier.fillMaxSize()) {
                     when (mode) {
                         AppMode.TV -> TvHomeScreen(BuildConfig.VERSION_NAME, change, updateSection)
-                        AppMode.PHONE -> PhoneHomeScreen(BuildConfig.VERSION_NAME, change, updateSection)
+                        AppMode.PHONE -> PhonePermissionGate { PhoneHomeScreen(BuildConfig.VERSION_NAME, change, updateSection) }
                     }
                     // Güncelleme linki açılışta denetlenir; yayın sürümünde yeni APK kendiliğinden inip kurulum açılır.
                     AutoUpdater(BuildConfig.VERSION_CODE, updates, autoDownload = !BuildConfig.DEBUG)
