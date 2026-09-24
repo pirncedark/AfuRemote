@@ -51,16 +51,14 @@ fun DiscoveryScreen(
     scanning: Boolean,
     onSelect: (TvDevice) -> Unit,
     onRefresh: () -> Unit,
-    onSettings: () -> Unit,
-    onClose: (() -> Unit)?
+    onClose: () -> Unit
 ) {
     Box(Modifier.fillMaxSize().background(Color(0xFF232323))) {
         GlowBackground()
         Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 28.dp).verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                RoundTap(Glyph.GEAR, "Ayarlar", onSettings)
                 Spacer(Modifier.weight(1f))
-                if (onClose != null) RoundTap(Glyph.CLOSE, "Kapat", onClose)
+                RoundTap(Glyph.CLOSE, "Kapat", onClose, size = 26)
             }
             Text("televizyonlar", color = RemoteColors.Text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp, modifier = Modifier.padding(top = 36.dp))
 
