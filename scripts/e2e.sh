@@ -81,13 +81,14 @@ dismiss_update settings_button
 tap_text settings_button "Ayarlar" || fail "settings button was not found"
 wait_text 40 "Güncellemeleri denetle" update_check || fail "update check button did not appear"
 tap_text update_check "Güncellemeleri denetle" || fail "update check button was not found"
-if ! wait_text 30 "Yeni AfuRemote sürümü: 0.1.0" update_dialog; then
+# Newest published release (any version) must be offered to the versionCode-1 debug build.
+if ! wait_text 30 "Yeni AfuRemote sürümü: [0-9]" update_dialog; then
   dump update_rate_limit
   if grep -Eqi 'GitHub 403|rate limit' "$OUT/update_rate_limit.xml"; then
     echo "SKIP 10: GitHub rate limit"
     exit 0
   fi
-  fail "new version 0.1.0 was not found"
+  fail "no newer published version was offered"
 fi
 tap_text update_dialog "İndir ve kur" || fail "download button was not found"
 installer_open=0
