@@ -10,6 +10,8 @@ import com.afudm.afuremote.protocol.DEVICE_HEADER
 import com.afudm.afuremote.protocol.HATA_ERISILEBILIRLIK
 import com.afudm.afuremote.protocol.InfoResponse
 import com.afudm.afuremote.protocol.KeyRequest
+import com.afudm.afuremote.protocol.LaunchRequest
+import com.afudm.afuremote.protocol.TextRequest
 import com.afudm.afuremote.protocol.NONCE_HEADER
 import com.afudm.afuremote.protocol.OpenRequest
 import com.afudm.afuremote.protocol.PairConfirmRequest
@@ -36,7 +38,13 @@ interface TvActions {
     suspend fun awaitPairApproval(pairId: String): PairDecision
     fun open(link: ClassifiedLink, title: String): ApiResult
     fun key(key: RemoteKey): ApiResult
+    fun launch(pkg: String): ApiResult = ApiResult(false, "desteklenmiyor")
+    fun text(text: String): ApiResult = ApiResult(false, "desteklenmiyor")
 }
+
+/** İmzalı istek isteyen uçlar. */
+private val SIGNED_PATHS = setOf("/v1/open", "/v1/key", "/v1/launch", "/v1/text")
+private val PACKAGE_RE = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+")
 
 data class RouterResponse(val status: Int, val body: String)
 
@@ -64,7 +72,7 @@ class TvRouter(
         if (method == "GET" && path == "/v1/info") return ok(ProtocolJson.encodeToString(actions.info()))
         if (method == "POST" && path == "/v1/pair/start") return start(ProtocolJson.decodeFromString(body))
         if (method == "POST" && path == "/v1/pair/confirm") return confirm(ProtocolJson.decodeFromString(body))
-        if (method != "POST" || (path != "/v1/open" && path != "/v1/key")) return error(404, "yok")
+        if (method != "POST" || path !in SIGNED_PATHS) return error(404, "yok")
 
         val device = header(DEVICE_HEADER).orEmpty()
         val time = header(TIME_HEADER)?.toLongOrNull() ?: return error(401, "izin_yok")
@@ -78,7 +86,12 @@ class TvRouter(
         if (!PairCrypto.secureEquals(expected.toByteArray(), sig.toByteArray()) || !registry.acceptNonce(device, nonce, current)) {
             return error(401, "izin_yok")
         }
-        return if (path == "/v1/open") open(ProtocolJson.decodeFromString(body)) else key(ProtocolJson.decodeFromString(body))
+        return when (path) {
+            "/v1/open" -> open(ProtocolJson.decodeFromString(body))
+            "/v1/launch" -> launch(ProtocolJson.decodeFromString(body))
+            "/v1/text" -> text(ProtocolJson.decodeFromString(body))
+            else -> key(ProtocolJson.decodeFromString(body))
+        }
     }
 
     @Synchronized
@@ -123,6 +136,16 @@ class TvRouter(
     private fun key(req: KeyRequest): RouterResponse {
         val key = RemoteKey.fromWire(req.key) ?: return error(400, "bilinmeyen_tus")
         return result(actions.key(key))
+    }
+
+    private fun launch(req: LaunchRequest): RouterResponse {
+        if (req.pkg.length > 128 || !req.pkg.matches(PACKAGE_RE)) return error(400, "bozuk_istek")
+        return result(actions.launch(req.pkg))
+    }
+
+    private fun text(req: TextRequest): RouterResponse {
+        if (req.text.length > 500) return error(400, "bozuk_istek")
+        return result(actions.text(req.text))
     }
 
     private fun result(r: ApiResult) = RouterResponse(if (r.ok) 200 else if (r.hata == HATA_ERISILEBILIRLIK) 409 else 500, ProtocolJson.encodeToString(r))

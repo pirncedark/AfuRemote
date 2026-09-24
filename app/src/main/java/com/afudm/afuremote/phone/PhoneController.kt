@@ -1,10 +1,14 @@
 package com.afudm.afuremote.phone
 
+import com.afudm.afuremote.protocol.LaunchRequest
 import com.afudm.afuremote.protocol.OpenRequest
+import com.afudm.afuremote.protocol.ProtocolJson
+import com.afudm.afuremote.protocol.TextRequest
 import com.afudm.afuremote.protocol.PairStartRequest
 import com.afudm.afuremote.protocol.RemoteKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
 
 /** TV anahtarı yoksa veya TV tanımıyorsa yeniden eşleştirir. */
 class PhoneController(private val api: TvApi, private val store: TokenStore, private val deviceName: String) {
@@ -13,6 +17,12 @@ class PhoneController(private val api: TvApi, private val store: TokenStore, pri
 
     suspend fun key(tv: TvDevice, key: RemoteKey, onPairing: (String) -> Unit): SendResult =
         withAuth(tv, onPairing) { api.key(tv, it, key) }
+
+    suspend fun launch(tv: TvDevice, pkg: String, onPairing: (String) -> Unit): SendResult =
+        withAuth(tv, onPairing) { api.command(tv, it, "/v1/launch", ProtocolJson.encodeToString(LaunchRequest(pkg))) }
+
+    suspend fun text(tv: TvDevice, text: String, onPairing: (String) -> Unit): SendResult =
+        withAuth(tv, onPairing) { api.command(tv, it, "/v1/text", ProtocolJson.encodeToString(TextRequest(text))) }
 
     private suspend fun withAuth(tv: TvDevice, onPairing: (String) -> Unit, call: (String) -> SendResult): SendResult =
         withContext(Dispatchers.IO) {

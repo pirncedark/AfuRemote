@@ -28,6 +28,10 @@ class TvRouterTest {
         override suspend fun awaitPairApproval(pairId: String) = decision
         override fun open(link: ClassifiedLink, title: String): ApiResult { opened += link; return ApiResult(true) }
         override fun key(key: RemoteKey): ApiResult { keys += key; return keyResult }
+        val launched = mutableListOf<String>()
+        val typed = mutableListOf<String>()
+        override fun launch(pkg: String): ApiResult { launched += pkg; return ApiResult(true) }
+        override fun text(text: String): ApiResult { typed += text; return ApiResult(true) }
     }
 
     private val actions = FakeActions()
@@ -133,5 +137,29 @@ class TvRouterTest {
         actions.keyResult = ApiResult(false, HATA_ERISILEBILIRLIK)
         val body="""{"key":"back"}"""
         assertEquals(409, call("POST", "/v1/key", body, signed("/v1/key",body)).status)
+    }
+
+    @Test
+    fun `launch and text need a signature and validate input`() {
+        pair()
+        val ok = """{"pkg":"com.netflix.ninja"}"""
+        assertEquals(401, call("POST", "/v1/launch", ok).status)
+        assertEquals(200, call("POST", "/v1/launch", ok, signed("/v1/launch", ok)).status)
+        val bad = """{"pkg":"../../etc"}"""
+        assertEquals(400, call("POST", "/v1/launch", bad, signed("/v1/launch", bad)).status)
+        val text = """{"text":"kurtlar vadisi"}"""
+        assertEquals(200, call("POST", "/v1/text", text, signed("/v1/text", text)).status)
+        assertEquals(listOf("com.netflix.ninja"), actions.launched)
+        assertEquals(listOf("kurtlar vadisi"), actions.typed)
+    }
+
+    @Test
+    fun `dpad and power keys are accepted`() {
+        pair()
+        listOf("up", "down", "left", "right", "ok", "power").forEach { k ->
+            val body = """{"key":"$k"}"""
+            assertEquals(k, 200, call("POST", "/v1/key", body, signed("/v1/key", body)).status)
+        }
+        assertEquals(listOf(RemoteKey.DPAD_UP, RemoteKey.DPAD_DOWN, RemoteKey.DPAD_LEFT, RemoteKey.DPAD_RIGHT, RemoteKey.DPAD_CENTER, RemoteKey.POWER), actions.keys)
     }
 }

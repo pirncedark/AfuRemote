@@ -65,6 +65,8 @@ class TvClient(
 
     override fun key(tv: TvDevice, authKey: String, key: RemoteKey) = send(tv, authKey, "/v1/key", ProtocolJson.encodeToString(KeyRequest(key.wire)))
 
+    override fun command(tv: TvDevice, authKey: String, path: String, json: String) = send(tv, authKey, path, json)
+
     private fun send(tv: TvDevice, keyHex: String, path: String, json: String): SendResult = try {
         val key = keyHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val first = execute(tv, key, path, json)

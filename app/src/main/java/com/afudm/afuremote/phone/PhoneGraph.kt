@@ -7,7 +7,7 @@ import com.afudm.afuremote.pairing.PairingStore
 
 /** Telefon tarafı nesneleri tek yerde (MainActivity ve ShareActivity paylaşır). */
 object PhoneGraph {
-    class Graph(val store: PairingStore, val client: TvClient, val discovery: TvDiscovery, val controller: PhoneController)
+    class Graph(val store: PairingStore, val client: TvClient, val known: KnownTvStore, val discovery: TvDiscovery, val controller: PhoneController)
 
     @Volatile private var instance: Graph? = null
 
@@ -19,6 +19,7 @@ object PhoneGraph {
         val store = PairingStore(app)
         val client = TvClient(deviceIdProvider = store::deviceId)
         val name = Settings.Global.getString(app.contentResolver, Settings.Global.DEVICE_NAME)?.takeIf { it.isNotBlank() } ?: Build.MODEL
-        return Graph(store, client, TvDiscovery(app, client), PhoneController(client, store, name))
+        val known = KnownTvStore(app)
+        return Graph(store, client, known, TvDiscovery(app, client, known), PhoneController(client, store, name))
     }
 }

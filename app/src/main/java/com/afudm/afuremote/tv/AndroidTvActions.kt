@@ -63,8 +63,32 @@ class AndroidTvActions(private val context: Context, private val store: PairingS
             }
             RemoteKey.BACK -> return accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
             RemoteKey.HOME -> return accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+            RemoteKey.DPAD_UP, RemoteKey.DPAD_DOWN, RemoteKey.DPAD_LEFT, RemoteKey.DPAD_RIGHT, RemoteKey.DPAD_CENTER -> {
+                val service = RemoteAccessibilityService.instance ?: return accessibilityError()
+                return if (service.dpad(key)) ApiResult(true) else ApiResult(false, "islem_basarisiz")
+            }
+            RemoteKey.POWER -> {
+                if (android.os.Build.VERSION.SDK_INT < 28) return ApiResult(false, "desteklenmiyor")
+                return accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+            }
         }
         return ApiResult(true)
+    }
+
+    override fun launch(pkg: String): ApiResult {
+        val pm = context.packageManager
+        val intent = pm.getLeanbackLaunchIntentForPackage(pkg) ?: pm.getLaunchIntentForPackage(pkg)
+            ?: return ApiResult(false, "uygulama_bulunamadi")
+        return when (launch(intent)) {
+            LaunchResult.OK -> ApiResult(true)
+            LaunchResult.NO_APP -> ApiResult(false, "uygulama_bulunamadi")
+            LaunchResult.NOT_ALLOWED -> accessibilityError()
+        }
+    }
+
+    override fun text(text: String): ApiResult {
+        val service = RemoteAccessibilityService.instance ?: return accessibilityError()
+        return if (service.typeText(text)) ApiResult(true) else ApiResult(false, "yazi_alani_yok")
     }
 
     private fun dispatchMediaKey(audio: AudioManager, key: RemoteKey) {
