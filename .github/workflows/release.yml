@@ -50,6 +50,23 @@ jobs:
           mkdir -p release-assets
           cp app/build/outputs/apk/release/app-release.apk release-assets/AfuRemote-universal.apk
           (cd release-assets && sha256sum AfuRemote-universal.apk > AfuRemote-universal.apk.sha256)
+          VERSION_NAME="${GITHUB_REF_NAME#afuremote-v}"
+          BASE_VERSION="${VERSION_NAME%%-*}"
+          VERSION_CODE=$(echo "$BASE_VERSION" | awk -F. '{print ($1*1000000)+($2*1000)+$3}')
+          SHA256=$(cut -d' ' -f1 release-assets/AfuRemote-universal.apk.sha256)
+          TAG="$GITHUB_REF_NAME" VERSION_NAME="$VERSION_NAME" VERSION_CODE="$VERSION_CODE" SHA256="$SHA256" python3 - <<'PY'
+          import json, os
+          manifest = {
+              "versionName": os.environ["VERSION_NAME"],
+              "versionCode": int(os.environ["VERSION_CODE"]),
+              "tag": os.environ["TAG"],
+              "apk": "AfuRemote-universal.apk",
+              "sha256": os.environ["SHA256"],
+              "changelog": "AfuRemote güncellemesi"
+          }
+          with open("release-assets/AfuRemote-update.json", "w", encoding="utf-8") as f:
+              json.dump(manifest, f, ensure_ascii=False, separators=(",", ":"))
+          PY
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -87,3 +104,4 @@ jobs:
           files: |
             release-assets/AfuRemote-universal.apk
             release-assets/AfuRemote-universal.apk.sha256
+            release-assets/AfuRemote-update.json
