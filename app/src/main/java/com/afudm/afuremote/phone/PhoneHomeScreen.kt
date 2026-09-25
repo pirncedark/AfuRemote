@@ -57,7 +57,9 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
 
     // Son seçilen TV, doğrulanmadan önce de gösterilir (nokta kırmızı kalır).
     var current by remember {
-        mutableStateOf(graph.known.all().firstOrNull { it.id == graph.known.lastSelected }?.let { TvDevice(it.id, it.name, it.model, it.host, it.port, "") })
+        mutableStateOf(graph.known.all().firstOrNull { it.id == graph.known.lastSelected }?.let {
+            TvDevice(it.id, it.name, it.model, it.host, it.port, "", runCatching { TvDevice.Backend.valueOf(it.backend) }.getOrDefault(TvDevice.Backend.AFUREMOTE), it.subtitle)
+        })
     }
     var picker by remember { mutableStateOf(current == null) }
     var settings by remember { mutableStateOf(false) }
