@@ -9,7 +9,11 @@ plugins {
 protobuf {
     protoc { artifact = "com.google.protobuf:protoc:4.32.1" }
     generateProtoTasks {
-        all().configureEach { builtins { named("java") { option("lite") } } }
+        all().configureEach {
+            // Android's empty androidTest proto task may not have registered the
+            // Java builtin yet. Register it explicitly for every Android variant.
+            builtins { create("java") { option("lite") } }
+        }
     }
 }
 
