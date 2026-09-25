@@ -1,6 +1,6 @@
 package com.afudm.afuremote.phone
 
-data class TvDevice(val id: String, val name: String, val model: String, val host: String, val port: Int, val serviceName: String, val backend: Backend = Backend.AFUREMOTE) {
+data class TvDevice(val id: String, val name: String, val model: String, val host: String, val port: Int, val serviceName: String, val backend: Backend = Backend.AFUREMOTE, val subtitle: String = "") {
     fun url(path: String): String = "http://${hostForUrl(host)}:$port$path"
 
     enum class Backend { AFUREMOTE, ATV_REMOTE_V2 }

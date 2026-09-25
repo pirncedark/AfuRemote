@@ -44,7 +44,7 @@ object AtvPairingSecret {
     }
 }
 
-data class AtvMdnsResult(val serviceName: String, val name: String, val host: String, val port: Int, val backend: Backend) {
+data class AtvMdnsResult(val serviceName: String, val name: String, val host: String, val port: Int, val backend: Backend, val bt: String = "") {
     enum class Backend { AFUREMOTE, ATV_REMOTE_V2, GOOGLE_CAST }
     val identity: String get() = host.lowercase()
 
@@ -59,9 +59,10 @@ data class AtvMdnsResult(val serviceName: String, val name: String, val host: St
                 else -> return null
             }
             val fn = txt.firstNotNullOfOrNull { it.takeIf { value -> value.startsWith("fn=") }?.substringAfter('=') }
+            val bt = txt.firstNotNullOfOrNull { it.takeIf { value -> value.startsWith("bt=") }?.substringAfter('=') }.orEmpty()
             val instance = normalized.substringBefore("._")
-            val name = fn?.takeIf(String::isNotBlank) ?: instance.ifBlank { host }
-            return AtvMdnsResult(normalized, name, host, port, backend)
+            val name = (if (backend == Backend.ATV_REMOTE_V2) instance else fn?.takeIf(String::isNotBlank) ?: instance).ifBlank { host }
+            return AtvMdnsResult(normalized, name, host, port, backend, bt)
         }
 
         fun merge(results: List<AtvMdnsResult>): List<AtvMdnsResult> = results

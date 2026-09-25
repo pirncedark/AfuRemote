@@ -43,6 +43,9 @@ import com.afudm.afuremote.ui.ModeSection
 import com.afudm.afuremote.ui.RemoteColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 @Composable
 fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer: @Composable () -> Unit = {}) {
@@ -64,6 +67,9 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
     var manualIp by remember { mutableStateOf("") }
     var ipError by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("") }
+    var pairingDevice by remember { mutableStateOf<TvDevice?>(null) }
+    var pairingCode by remember { mutableStateOf("") }
+    var codeWaiter by remember { mutableStateOf<CompletableDeferred<String?>?>(null) }
 
     DisposableEffect(Unit) {
         graph.discovery.acquire()
@@ -102,6 +108,21 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
         }
     }
     val onPairing: (String) -> Unit = { status = it }
+    suspend fun askForAtvCode(target: TvDevice): String = withContext(Dispatchers.Main) {
+        pairingCode = ""
+        pairingDevice = target
+        CompletableDeferred<String?>().also { codeWaiter = it }
+    }.await() ?: throw IllegalStateException("Eşleştirme iptal edildi")
+    suspend fun pairAtv(target: TvDevice): Boolean = graph.atvPairing.pair(target.host, target.port, "AfuRemote") { askForAtvCode(target) }
+    suspend fun remoteKey(target: TvDevice, key: com.afudm.afuremote.protocol.RemoteKey): SendResult =
+        if (target.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.key(target, key) { pairAtv(target) }
+        else graph.controller.key(target, key, onPairing)
+    suspend fun remoteText(target: TvDevice, value: String): SendResult =
+        if (target.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.text(target, value) { pairAtv(target) }
+        else graph.controller.text(target, value, onPairing)
+    suspend fun remoteLaunch(target: TvDevice, app: String): SendResult =
+        if (target.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.launch(target, "market://launch?id=$app") { pairAtv(target) }
+        else graph.controller.launch(target, app, onPairing)
 
     val tv = current
     Box(Modifier.fillMaxSize().background(RemoteColors.Background)) {
@@ -110,8 +131,8 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
                 tv = tv,
                 online = tv != null && devices.any { it.id == tv.id },
                 status = status,
-                onKey = { k -> send { graph.controller.key(it, k, onPairing) } },
-                onLaunch = { pkg -> send { graph.controller.launch(it, pkg, onPairing) } },
+                onKey = { k -> send { remoteKey(it, k) } },
+                onLaunch = { pkg -> send { remoteLaunch(it, pkg) } },
                 onText = { textDialog = true },
                 onLink = { linkDialog = true },
                 onPickTv = { picker = true },
@@ -131,10 +152,24 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
         }
         if (settings) {
             SettingsPage(versionName, onModeChange, footer, onClose = { settings = false }) { url ->
-                send(quiet = false) { graph.controller.open(it, OpenRequest(url), onPairing) }
+                send(quiet = false) { if (it.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.launch(it, url) { pairAtv(it) } else graph.controller.open(it, OpenRequest(url), onPairing) }
             }
             BackHandler { settings = false }
         }
+    }
+
+    if (pairingDevice != null) {
+        AlertDialog(
+            onDismissRequest = { codeWaiter?.complete(null); codeWaiter = null; pairingDevice = null },
+            title = { Text("${pairingDevice?.name} ile eşleştir") },
+            text = { Column {
+                Text("TV ekranında görünen 6 haneli hexadecimal kodu girin.")
+                OutlinedTextField(value = pairingCode, onValueChange = { pairingCode = it.filter { c -> c.isDigit() || c.lowercaseChar() in 'a'..'f' }.take(6) }, label = { Text("TV kodu") }, singleLine = true)
+                pairingDevice?.subtitle?.takeIf { it.matches(Regex("[0-9A-Fa-f:]{11,}")) }?.let { Text(it, color = RemoteColors.Muted) }
+            } },
+            confirmButton = { TextButton(onClick = { codeWaiter?.complete(pairingCode); codeWaiter = null; pairingDevice = null }) { Text("Eşleştir") } },
+            dismissButton = { TextButton(onClick = { codeWaiter?.complete(null); codeWaiter = null; pairingDevice = null }) { Text("Vazgeç") } }
+        )
     }
 
     if (ipDialog) {
@@ -162,7 +197,7 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
         fun submit() {
             val value = text
             textDialog = false
-            if (value.isNotEmpty()) send(quiet = false) { graph.controller.text(it, value, onPairing) }
+            if (value.isNotEmpty()) send(quiet = false) { remoteText(it, value) }
         }
         AlertDialog(
             onDismissRequest = { textDialog = false },
@@ -184,7 +219,7 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
         fun submit() {
             val url = LinkClassifier.extractUrl(link) ?: run { error = "Geçerli bir link yazın"; return }
             linkDialog = false
-            send(quiet = false) { graph.controller.open(it, OpenRequest(url), onPairing) }
+            send(quiet = false) { if (it.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.launch(it, url) { pairAtv(it) } else graph.controller.open(it, OpenRequest(url), onPairing) }
         }
         AlertDialog(
             onDismissRequest = { linkDialog = false },

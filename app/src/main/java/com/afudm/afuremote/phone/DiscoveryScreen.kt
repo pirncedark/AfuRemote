@@ -113,7 +113,7 @@ private fun DeviceRow(tv: TvDevice, selected: Boolean, onClick: () -> Unit) {
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(tv.name, color = RemoteColors.Text, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-            Text(if (tv.model == tv.name) "Android TV" else tv.model, color = RemoteColors.Muted, fontSize = 13.sp)
+            Text(tv.subtitle.ifBlank { if (tv.model == tv.name) "Android TV" else tv.model }, color = RemoteColors.Muted, fontSize = 13.sp)
         }
         Box(Modifier.size(10.dp).clip(CircleShape).background(RemoteColors.Online))
     }

@@ -213,11 +213,12 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
         if (service.serviceType.contains("_androidtvremote2._tcp") || service.serviceType.contains("_googlecast._tcp")) {
             val parsed = AtvMdnsResult.parse(service.serviceName, resolved.port, service.attributes.map { (k, v) -> "$k=${String(v, Charsets.UTF_8)}" }, host)
                 ?: return
-            val device = TvDevice("atv:${parsed.identity}", parsed.name, parsed.name, host, resolved.port, service.serviceName, TvDevice.Backend.ATV_REMOTE_V2)
+            val device = TvDevice("atv:${parsed.identity}", parsed.name, parsed.name, host, 6466, service.serviceName,
+                TvDevice.Backend.ATV_REMOTE_V2, parsed.bt.ifBlank { if (parsed.backend == AtvMdnsResult.Backend.GOOGLE_CAST) "Google Cast" else "Android TV" })
             _devices.update { old ->
                 val found = old.firstOrNull { it.host.equals(host, true) }
                 if (found == null) old + device
-                else old.map { if (it.host.equals(host, true)) it.copy(name = parsed.name.ifBlank { it.name }, serviceName = listOf(it.serviceName, service.serviceName).filter(String::isNotBlank).distinct().joinToString("+")) else it }
+                else old.map { if (it.host.equals(host, true)) it.copy(name = parsed.name.ifBlank { it.name }, serviceName = listOf(it.serviceName, service.serviceName).filter { name -> name.isNotBlank() }.distinct().joinToString("+")) else it }
             }
             return
         }
