@@ -7,6 +7,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.util.Log
 import com.afudm.afuremote.net.LocalIp
+import com.afudm.afuremote.atvremote.AtvMdnsResult
 import com.afudm.afuremote.net.Subnet
 import com.afudm.afuremote.protocol.SERVICE_TYPE
 import com.afudm.afuremote.protocol.TV_PORT
@@ -61,7 +62,7 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
     val devices: StateFlow<List<TvDevice>> = _devices.asStateFlow()
     private val _scanning = MutableStateFlow(false)
     val scanning: StateFlow<Boolean> = _scanning.asStateFlow()
-    private var listener: NsdManager.DiscoveryListener? = null
+    private val listeners = mutableListOf<NsdManager.DiscoveryListener>()
     private var multicast: WifiManager.MulticastLock? = null
     private var job: Job? = null
     private var users = 0
@@ -99,13 +100,14 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
     private fun stop() {
         job?.cancel(); job = null
         _scanning.value = false
-        listener?.let { runCatching { nsd.stopServiceDiscovery(it) } }
-        listener = null
+        listeners.toList().forEach { runCatching { nsd.stopServiceDiscovery(it) } }
+        listeners.clear()
         multicast?.let { runCatching { if (it.isHeld) it.release() } }
         multicast = null
     }
 
     private fun startNsd() {
+        listOf(SERVICE_TYPE, "_androidtvremote2._tcp.", "_googlecast._tcp.").forEach { serviceType ->
         val l = object : NsdManager.DiscoveryListener {
             override fun onServiceFound(service: NsdServiceInfo) { scope.launch { resolveAndVerify(service) } }
             override fun onServiceLost(service: NsdServiceInfo) {
@@ -116,9 +118,10 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) { Log.e(TAG, "arama baslamadi: $errorCode") }
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
         }
-        listener = l
-        runCatching { nsd.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, l) }
-            .onFailure { Log.e(TAG, "NSD baslatilamadi", it); listener = null }
+        listeners += l
+        runCatching { nsd.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, l) }
+            .onFailure { Log.e(TAG, "NSD baslatilamadi ($serviceType)", it); listeners.remove(l) }
+        }
     }
 
     private suspend fun scanSubnet() {
@@ -208,6 +211,18 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
     private suspend fun resolveAndVerify(service: NsdServiceInfo) {
         val resolved = withTimeoutOrNull(RESOLVE_TIMEOUT_MS) { resolveLock.withLock { resolve(service) } } ?: return
         val host = pickHost(resolved) ?: return
+        if (service.serviceType.contains("_androidtvremote2._tcp") || service.serviceType.contains("_googlecast._tcp")) {
+            val parsed = AtvMdnsResult.parse(service.serviceName, resolved.port, service.attributes.map { (k, v) -> "$k=${String(v, Charsets.UTF_8)}" }, host)
+                ?: return
+            val device = TvDevice("atv:${parsed.identity}", parsed.name, parsed.name, host, 6466, service.serviceName,
+                TvDevice.Backend.ATV_REMOTE_V2, parsed.bt.ifBlank { if (parsed.backend == AtvMdnsResult.Backend.GOOGLE_CAST) "Google Cast" else "Android TV" })
+            _devices.update { old ->
+                val found = old.firstOrNull { it.host.equals(host, true) }
+                if (found == null) old + device
+                else old.map { if (it.host.equals(host, true)) it.copy(name = parsed.name.ifBlank { it.name }, serviceName = listOf(it.serviceName, service.serviceName).filter { name -> name.isNotBlank() }.distinct().joinToString("+")) else it }
+            }
+            return
+        }
         verify(host, resolved.port, service.serviceName)
     }
 

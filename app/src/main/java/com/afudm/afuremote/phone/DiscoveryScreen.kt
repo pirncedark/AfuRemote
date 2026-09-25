@@ -81,7 +81,7 @@ fun DiscoveryScreen(
                     color = RemoteColors.Muted, fontSize = 15.sp, lineHeight = 24.sp, letterSpacing = 0.4.sp
                 )
                 Text(
-                    "TV'de AfuRemote kurulu ve bir kez açılmış olmalı.",
+                    "Android TV Remote hizmeti olan TV'ler ve projeksiyonlar da burada görünür.",
                     color = RemoteColors.Muted.copy(alpha = .7f), fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)
                 )
             }
@@ -113,7 +113,7 @@ private fun DeviceRow(tv: TvDevice, selected: Boolean, onClick: () -> Unit) {
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(tv.name, color = RemoteColors.Text, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-            Text(if (tv.model == tv.name) tv.host else "${tv.model} · ${tv.host}", color = RemoteColors.Muted, fontSize = 13.sp)
+            Text(tv.subtitle.ifBlank { if (tv.model == tv.name) "Android TV" else tv.model }, color = RemoteColors.Muted, fontSize = 13.sp)
         }
         Box(Modifier.size(10.dp).clip(CircleShape).background(RemoteColors.Online))
     }
