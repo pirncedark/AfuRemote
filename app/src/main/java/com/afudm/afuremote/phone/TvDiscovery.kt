@@ -7,6 +7,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.util.Log
 import com.afudm.afuremote.net.LocalIp
+import com.afudm.afuremote.atvremote.AtvMdnsResult
 import com.afudm.afuremote.net.Subnet
 import com.afudm.afuremote.protocol.SERVICE_TYPE
 import com.afudm.afuremote.protocol.TV_PORT
