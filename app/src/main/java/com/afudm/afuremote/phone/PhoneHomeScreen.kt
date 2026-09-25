@@ -81,6 +81,7 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
     fun select(tv: TvDevice) {
         current = tv
         graph.known.lastSelected = tv.id
+        graph.known.remember(tv)
         picker = false
     }
 
