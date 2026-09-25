@@ -3,6 +3,14 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.protobuf")
+}
+
+protobuf {
+    protoc { artifact = "com.google.protobuf:protoc:4.32.1" }
+    generateProtoTasks {
+        all().configureEach { builtins { named("java") { option("lite") } } }
+    }
 }
 
 val keystorePath: String? = System.getenv("AFUREMOTE_KEYSTORE_PATH")
@@ -44,6 +52,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.protobuf:protobuf-javalite:4.32.1")
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
