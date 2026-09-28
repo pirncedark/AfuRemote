@@ -14,6 +14,7 @@ const val TIME_HEADER = "X-Afu-Time"
 const val NONCE_HEADER = "X-Afu-Nonce"
 const val SIGNATURE_HEADER = "X-Afu-Sig"
 const val HATA_ERISILEBILIRLIK = "erisilebilirlik_kapali"
+const val HATA_GUC_KAPALI = "guc_kapali"
 
 @Serializable
 data class InfoResponse(

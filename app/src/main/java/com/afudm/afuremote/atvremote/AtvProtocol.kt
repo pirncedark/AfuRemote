@@ -33,14 +33,15 @@ object AtvFraming {
 
 object AtvPairingSecret {
     fun calculate(clientModulus: ByteArray, clientExponent: ByteArray, serverModulus: ByteArray, serverExponent: ByteArray, nonce: ByteArray): ByteArray {
-        require(nonce.size == 4)
+        require(nonce.size == 2)
         return MessageDigest.getInstance("SHA-256").digest(clientModulus + clientExponent + serverModulus + serverExponent + nonce)
     }
 
     fun matches(code: String, secret: ByteArray): Boolean {
         if (!code.matches(Regex("[0-9a-fA-F]{6}"))) return false
-        val prefix = code.substring(0, 2).toInt(16).toByte()
-        return secret.isNotEmpty() && secret[0] == prefix
+        // secret[0] 0..255 olabilir; toByte() 128'de taşıp negatif döner, hatalı karşılaştırma verir.
+        val prefix = code.substring(0, 2).toInt(16) and 0xff
+        return secret.isNotEmpty() && (secret[0].toInt() and 0xff) == prefix
     }
 }
 

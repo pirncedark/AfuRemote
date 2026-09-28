@@ -5,6 +5,7 @@ import com.afudm.afuremote.classify.LinkKind
 import com.afudm.afuremote.pairing.TokenRegistry
 import com.afudm.afuremote.protocol.ApiResult
 import com.afudm.afuremote.protocol.HATA_ERISILEBILIRLIK
+import com.afudm.afuremote.protocol.HATA_GUC_KAPALI
 import com.afudm.afuremote.protocol.InfoResponse
 import com.afudm.afuremote.protocol.KeyRequest
 import com.afudm.afuremote.protocol.OpenRequest
@@ -161,5 +162,15 @@ class TvRouterTest {
             assertEquals(k, 200, call("POST", "/v1/key", body, signed("/v1/key", body)).status)
         }
         assertEquals(listOf(RemoteKey.DPAD_UP, RemoteKey.DPAD_DOWN, RemoteKey.DPAD_LEFT, RemoteKey.DPAD_RIGHT, RemoteKey.DPAD_CENTER, RemoteKey.POWER), actions.keys)
+    }
+
+    @Test
+    fun `power reports unsupported instead of locking the screen`() {
+        pair()
+        actions.keyResult = ApiResult(false, HATA_GUC_KAPALI)
+        val body = """{"key":"power"}"""
+        val r = call("POST", "/v1/key", body, signed("/v1/key", body))
+        assertEquals(500, r.status)
+        assertEquals(HATA_GUC_KAPALI, ProtocolJson.decodeFromString<ApiResult>(r.body).hata)
     }
 }

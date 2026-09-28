@@ -85,8 +85,8 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
         startNsd()
         job = scope.launch {
             _scanning.value = true
-            known.all().forEach { tv -> launch { verify(tv.host, tv.port, "") } }
-            _devices.value.forEach { tv -> launch { verify(tv.host, tv.port, tv.serviceName) } }
+            known.all().forEach { tv -> launch { restore(TvDevice(tv.id, tv.name, tv.model, tv.host, tv.port, "", runCatching { TvDevice.Backend.valueOf(tv.backend) }.getOrDefault(TvDevice.Backend.AFUREMOTE), tv.subtitle)) } }
+            _devices.value.forEach { tv -> launch { restore(tv) } }
             delay(NSD_GRACE_MS)
             if (forceScan || _devices.value.isEmpty()) { scanUdp(); if (_devices.value.isEmpty()) scanSubnet() }
             _scanning.value = false
@@ -173,8 +173,8 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
         }
     }
 
-    private fun portOpen(host: String): Boolean = runCatching {
-        Socket().use { it.connect(InetSocketAddress(host, TV_PORT), SCAN_CONNECT_MS) }
+    private fun portOpen(host: String, port: Int = TV_PORT): Boolean = runCatching {
+        Socket().use { it.connect(InetSocketAddress(host, port), SCAN_CONNECT_MS) }
         true
     }.getOrDefault(false)
 
@@ -182,7 +182,10 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
         coroutineScope {
             _devices.value.forEach { tv ->
                 launch {
-                    val alive = probe.info(tv.host, tv.port)?.id == tv.id
+                    // v2 cihazlar 6466'da TLS+protobuf konuşur; HTTP /v1/info yoklaması her
+                    // seferinde başarısız olur ve cihaz yanlışlıkla ölü sayılırdı.
+                    val alive = if (tv.backend == TvDevice.Backend.ATV_REMOTE_V2) portOpen(tv.host, tv.port)
+                    else probe.info(tv.host, tv.port)?.id == tv.id
                     if (alive) misses.remove(tv.id)
                     else if ((misses.merge(tv.id, 1) { a, b -> a + b } ?: 0) >= 2) {
                         misses.remove(tv.id)
@@ -208,6 +211,20 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
         Log.i(TAG, "TV bulundu: ${info.name} ($host)")
     }
 
+    /**
+     * Kayıtlı ya da listelenmiş cihazı geri yükler. v2 cihazlarda /v1/info yoklaması
+     * kullanılamaz (6466 TLS konuşur), bu yüzden kimlik kayıttan gelir.
+     */
+    private fun restore(tv: TvDevice) {
+        if (tv.backend == TvDevice.Backend.ATV_REMOTE_V2) {
+            if (!portOpen(tv.host, tv.port)) return
+            misses.remove(tv.id)
+            _devices.update { list -> if (list.any { it.id == tv.id }) list else list + tv }
+            return
+        }
+        verify(tv.host, tv.port, tv.serviceName)
+    }
+
     private suspend fun resolveAndVerify(service: NsdServiceInfo) {
         val resolved = withTimeoutOrNull(RESOLVE_TIMEOUT_MS) { resolveLock.withLock { resolve(service) } } ?: return
         val host = pickHost(resolved) ?: return
@@ -216,6 +233,8 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
                 ?: return
             val device = TvDevice("atv:${parsed.identity}", parsed.name, parsed.name, host, 6466, service.serviceName,
                 TvDevice.Backend.ATV_REMOTE_V2, parsed.bt.ifBlank { if (parsed.backend == AtvMdnsResult.Backend.GOOGLE_CAST) "Google Cast" else "Android TV" })
+            misses.remove(device.id)
+            known.remember(device)
             _devices.update { old ->
                 val found = old.firstOrNull { it.host.equals(host, true) }
                 if (found == null) old + device

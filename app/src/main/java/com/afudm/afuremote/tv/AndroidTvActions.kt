@@ -13,6 +13,7 @@ import com.afudm.afuremote.classify.ClassifiedLink
 import com.afudm.afuremote.classify.LinkKind
 import com.afudm.afuremote.pairing.PairingStore
 import com.afudm.afuremote.protocol.ApiResult
+import com.afudm.afuremote.protocol.HATA_GUC_KAPALI
 import com.afudm.afuremote.protocol.InfoResponse
 import com.afudm.afuremote.protocol.RemoteKey
 
@@ -67,10 +68,9 @@ class AndroidTvActions(private val context: Context, private val store: PairingS
                 val service = RemoteAccessibilityService.instance ?: return accessibilityError()
                 return if (service.dpad(key)) ApiResult(true) else ApiResult(false, "islem_basarisiz")
             }
-            RemoteKey.POWER -> {
-                if (android.os.Build.VERSION.SDK_INT < 28) return ApiResult(false, "desteklenmiyor")
-                return accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
-            }
+            // Erişilebilirlik servisi başka uygulamalara KEYCODE_POWER basamaz.
+            // Ekranı kilitlemek "güç" değildir; desteklenmediğini açıkça bildir.
+            RemoteKey.POWER -> return ApiResult(false, HATA_GUC_KAPALI)
         }
         return ApiResult(true)
     }
