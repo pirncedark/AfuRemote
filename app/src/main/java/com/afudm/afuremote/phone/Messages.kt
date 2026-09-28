@@ -3,6 +3,7 @@ package com.afudm.afuremote.phone
 import com.afudm.afuremote.protocol.ApiResult
 import com.afudm.afuremote.protocol.HATA_ERISILEBILIRLIK
 import com.afudm.afuremote.protocol.ProtocolJson
+import com.afudm.afuremote.protocol.HATA_GUC_KAPALI
 import kotlinx.serialization.decodeFromString
 
 /** Telefonda gösterilen metinler. "İzin ver" ifadesi burada KULLANILMAZ (TV düğmesinin etiketi). */
@@ -22,6 +23,7 @@ object Messages {
         return when (hata) {
             HATA_ERISILEBILIRLIK -> ACCESSIBILITY
             "gecersiz_link" -> "Bu link anlaşılamadı"
+            HATA_GUC_KAPALI -> "TV'yi kapatmak yalnızca Android TV kumanda bağlantısıyla çalışır"
             "acacak_uygulama_yok", "uygulama_bulunamadi" -> "TV'de bunu açabilecek uygulama yok"
             "bozuk_istek", "bilinmeyen_tus", "yok", "desteklenmiyor" -> OLD_TV
             "yazi_alani_yok" -> "TV'de önce bir yazı alanı seçin"

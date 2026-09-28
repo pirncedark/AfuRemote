@@ -12,7 +12,7 @@ import com.afudm.afuremote.atvremote.AtvRemoteClient
 /** Telefon tarafı nesneleri tek yerde (MainActivity ve ShareActivity paylaşır). */
 object PhoneGraph {
     class Graph(val store: PairingStore, val client: TvClient, val known: KnownTvStore, val discovery: TvDiscovery, val controller: PhoneController,
-                val atvPairing: AtvPairingManager, val atvRemote: AtvRemoteClient)
+                val atvPairing: AtvPairingManager, val atvRemote: AtvRemoteClient, val transport: RemoteTransport)
 
     @Volatile private var instance: Graph? = null
 
@@ -27,7 +27,10 @@ object PhoneGraph {
         val known = KnownTvStore(app)
         val credentials = AtvCredentialStore(app)
         val tls = AtvTlsClientFactory(credentials)
-        return Graph(store, client, known, TvDiscovery(app, client, known), PhoneController(client, store, name),
-            AtvPairingManager(credentials, tls), AtvRemoteClient(credentials, tls, name))
+        val controller = PhoneController(client, store, name)
+        val remote = AtvRemoteClient(credentials, tls, name)
+        val transport = RoutingRemoteTransport(controller, remote, client)
+        return Graph(store, client, known, TvDiscovery(app, client, known, transport), controller,
+            AtvPairingManager(credentials, tls), remote, transport)
     }
 }

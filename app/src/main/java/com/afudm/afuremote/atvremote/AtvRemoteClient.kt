@@ -1,69 +1,60 @@
 package com.afudm.afuremote.atvremote
 
-import com.afudm.afuremote.atvremote.proto.RemoteProto
+import com.afudm.afuremote.atvremote.protocol.AtvWireImeCounters
+import com.afudm.afuremote.atvremote.protocol.AtvWireProtocol
 import com.afudm.afuremote.phone.SendResult
 import com.afudm.afuremote.phone.TvDevice
 import com.afudm.afuremote.protocol.RemoteKey
-import java.io.InputStream
-import java.io.OutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-class AtvRemoteClient(private val credentials: AtvCredentialStore, private val tls: AtvTlsClientFactory, private val clientName: String) {
-    suspend fun key(tv: TvDevice, key: RemoteKey, pair: suspend () -> Boolean): SendResult = perform(tv, pair) { socket ->
-        val code = AtvCommandMapper.keyCode(key)
-        sendCommand(socket.outputStream, RemoteProto.RemoteMessage.newBuilder().setRemoteKeyInject(
-            RemoteProto.RemoteKeyInject.newBuilder().setKeyCodeValue(code).setDirection(RemoteProto.RemoteDirection.SHORT)).build())
+/** Manages one selected TV's persistent connection; no socket work runs on the UI thread. */
+class AtvRemoteClient(private val credentials: AtvCredentialStore, private val tls: AtvTlsClientFactory, private val clientName: String) : AutoCloseable {
+    @Volatile private var session: AtvSession? = null
+    @Volatile private var endpoint: String? = null
+
+    /** Opens a background session immediately for an already paired device. */
+    @Synchronized fun connect(tv: TvDevice) {
+        val key = "${tv.host.lowercase()}:${tv.port}"
+        if (endpoint == key && session != null) return
+        closeSession()
+        if (credentials.fingerprint(tv.host) == null) return
+        endpoint = key
+        session = AtvSession(tv.host, tv.port, tls).also { it.start() }
     }
 
-    suspend fun text(tv: TvDevice, value: String, pair: suspend () -> Boolean): SendResult = perform(tv, pair) { socket ->
-        val edit = RemoteProto.RemoteEditInfo.newBuilder().setInsert(1).setTextFieldStatus(
-            RemoteProto.RemoteImeObject.newBuilder().setValue(value).setStart(value.length).setEnd(value.length)).build()
-        sendCommand(socket.outputStream, RemoteProto.RemoteMessage.newBuilder().setRemoteImeBatchEdit(
-            RemoteProto.RemoteImeBatchEdit.newBuilder().setImeCounter(0).setFieldCounter(0).addEditInfo(edit)).build())
+    suspend fun key(tv: TvDevice, key: RemoteKey, pair: suspend () -> Boolean): SendResult = perform(tv, pair) { counters ->
+        AtvWireProtocol.keyMessage(AtvCommandMapper.keyCode(key))
     }
 
-    suspend fun launch(tv: TvDevice, appLink: String, pair: suspend () -> Boolean): SendResult = perform(tv, pair) { socket ->
-        sendCommand(socket.outputStream, RemoteProto.RemoteMessage.newBuilder().setRemoteAppLinkLaunchRequest(
-            RemoteProto.RemoteAppLinkLaunchRequest.newBuilder().setAppLink(appLink)).build())
+    suspend fun text(tv: TvDevice, value: String, pair: suspend () -> Boolean): SendResult = perform(tv, pair) { counters ->
+        AtvWireProtocol.imeMessage(value, counters)
     }
 
-    private suspend fun perform(tv: TvDevice, pair: suspend () -> Boolean, command: (javax.net.ssl.SSLSocket) -> Unit): SendResult = try {
-        if (credentials.fingerprint(tv.host) == null && !pair()) {
-            SendResult.Failed("TV ekranındaki 6 haneli kodla eşleştirme tamamlanmadı")
-        } else {
-            val (socket, _) = tls.connect(tv.host, tv.port, true)
-            socket.use {
-                val input = it.inputStream; val output = it.outputStream
-                var ready = false
-                for (attempt in 0 until 16) {
-                    val message = RemoteProto.RemoteMessage.parseFrom(readFrame(input))
-                    when {
-                        message.hasRemotePingRequest() -> sendCommand(output, RemoteProto.RemoteMessage.newBuilder().setRemotePingResponse(
-                            RemoteProto.RemotePingResponse.newBuilder().setVal1(message.remotePingRequest.val1)).build())
-                        message.hasRemoteConfigure() -> sendCommand(output, RemoteProto.RemoteMessage.newBuilder().setRemoteConfigure(
-                            RemoteProto.RemoteConfigure.newBuilder().setCode1(message.remoteConfigure.code1 and CAPABILITIES)
-                                .setDeviceInfo(RemoteProto.RemoteDeviceInfo.newBuilder().setModel("AfuRemote").setVendor("AfuRemote")
-                                    .setPackageName("com.afudm.afuremote").setAppVersion("1"))).build())
-                        message.hasRemoteSetActive() -> sendCommand(output, RemoteProto.RemoteMessage.newBuilder().setRemoteSetActive(
-                            RemoteProto.RemoteSetActive.newBuilder().setActive(1)).build())
-                        message.hasRemoteStart() -> { ready = message.remoteStart.started; if (ready) break }
-                    }
-                }
-                check(ready) { "TV kumanda oturumu başlamadı" }
-                command(it)
-            }
-            SendResult.Ok
+    suspend fun launch(tv: TvDevice, appLink: String, pair: suspend () -> Boolean): SendResult = perform(tv, pair) {
+        AtvWireProtocol.launchMessage(appLink)
+    }
+
+    private suspend fun perform(tv: TvDevice, pair: suspend () -> Boolean, command: (AtvWireImeCounters) -> com.afudm.afuremote.atvremote.proto.RemoteProto.RemoteMessage): SendResult = withContext(Dispatchers.IO) {
+        try {
+            if (credentials.fingerprint(tv.host) == null && !pair()) return@withContext SendResult.Failed("TV ekranındaki 6 haneli kodla eşleştirme tamamlanmadı")
+            synchronized(this@AtvRemoteClient) { connect(tv) }
+            val active = session ?: return@withContext SendResult.Failed("Android TV bağlantısı kurulamadı")
+            if (!active.send(command)) SendResult.Failed("Android TV bağlantısı kapandı; yeniden deneyin") else SendResult.Ok
+        } catch (e: Exception) {
+            SendResult.Failed(e.message ?: "Android TV Remote v2 bağlantısı kurulamadı")
         }
-    } catch (e: Exception) { SendResult.Failed(e.message ?: "Android TV Remote v2 bağlantısı kurulamadı") }
-
-    private fun sendCommand(output: OutputStream, message: RemoteProto.RemoteMessage) { output.write(AtvFraming.frame(message.toByteArray())); output.flush() }
-    private fun readFrame(input: InputStream): ByteArray {
-        var length = 0; var shift = 0
-        while (shift < 35) { val b = input.read(); check(b >= 0) { "TV bağlantısı kapandı" }; length = length or ((b and 0x7f) shl shift); if (b and 0x80 == 0) break; shift += 7 }
-        require(length in 1..1_048_576)
-        return ByteArray(length).also { bytes -> var pos = 0; while (pos < length) { val n = input.read(bytes, pos, length - pos); check(n > 0); pos += n } }
     }
 
-    private companion object { const val CAPABILITIES = (1 shl 0) or (1 shl 1) or (1 shl 2) or (1 shl 5) or (1 shl 6) or (1 shl 9) }
+    @Synchronized fun closeSelected() = closeSession()
+    fun currentState(): AtvSession.State = session?.state ?: AtvSession.State.STOPPED
+    @Synchronized override fun close() = closeSession()
+
+    private fun closeSession() {
+        session?.close()
+        session = null
+        endpoint = null
+    }
 }
 
 object AtvCommandMapper {

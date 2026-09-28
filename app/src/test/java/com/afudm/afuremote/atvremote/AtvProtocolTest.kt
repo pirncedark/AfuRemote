@@ -1,5 +1,7 @@
 package com.afudm.afuremote.atvremote
 
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -16,9 +18,9 @@ class AtvProtocolTest {
 
     @Test fun `pairing secret matches published algorithm vector`() {
         val hash = AtvPairingSecret.calculate(
-            byteArrayOf(1), byteArrayOf(1, 0, 1), byteArrayOf(2), byteArrayOf(3), byteArrayOf(0, 0, 0, 0)
+            byteArrayOf(1), byteArrayOf(1, 0, 1), byteArrayOf(2), byteArrayOf(3), byteArrayOf(0, 0)
         )
-        assertEquals("1439e40996f6ddfda4dc906344e6bdaa1c87cbcd6f4c977b4b80944b34f2cef8", hash.joinToString("") { "%02x".format(it) })
+        assertEquals("42b3a9ad043a48c95dd25c48a17d8c11004bb68cd90c689c4779b5b5312d4b1c", hash.joinToString("") { "%02x".format(it) })
     }
 
     @Test fun `cast TXT friendly name is used and identical endpoints merge`() {
@@ -53,5 +55,29 @@ class AtvProtocolTest {
         assertEquals(24, AtvCommandMapper.keyCode(RemoteKey.VOL_UP))
         assertEquals(164, AtvCommandMapper.keyCode(RemoteKey.MUTE))
         assertEquals(85, AtvCommandMapper.keyCode(RemoteKey.PLAY_PAUSE))
+    }
+
+    @Test
+    fun `pairing nonce is the two bytes after the code prefix`() {
+        // androidtvremote2: h.update(bytes.fromhex(pairing_code[2:])) — 4 hex karakter = 2 bayt.
+        val hash = AtvPairingSecret.calculate(
+            byteArrayOf(1), byteArrayOf(1, 0, 1), byteArrayOf(2), byteArrayOf(3), byteArrayOf(0xAB.toByte(), 0xCD.toByte())
+        )
+        val expected = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(byteArrayOf(1, 1, 0, 1, 2, 3, 0xAB.toByte(), 0xCD.toByte()))
+        assertArrayEquals(expected, hash)
+    }
+
+    @Test
+    fun `secret prefix comparison survives values above 127`() {
+        val code = "FF1234"
+        val secret = byteArrayOf(0xFF.toByte(), 0, 0, 0)
+        assertTrue(AtvPairingSecret.matches(code, secret))
+        assertFalse(AtvPairingSecret.matches("FE1234", secret))
+    }
+
+    @Test
+    fun `power key maps to KEYCODE_POWER`() {
+        assertEquals(26, AtvCommandMapper.keyCode(RemoteKey.POWER))
     }
 }

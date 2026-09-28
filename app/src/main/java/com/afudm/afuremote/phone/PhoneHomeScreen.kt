@@ -33,6 +33,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,6 +54,7 @@ import kotlinx.coroutines.Dispatchers
 fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val graph = remember { PhoneGraph.get(context) }
+    val lifecycleOwner = LocalLifecycleOwner.current
     val devices by graph.discovery.devices.collectAsState()
     val scanning by graph.discovery.scanning.collectAsState()
     val scope = rememberCoroutineScope()
@@ -78,10 +82,21 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
         onDispose { graph.discovery.release() }
     }
 
+    DisposableEffect(lifecycleOwner, current?.id) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) graph.transport.close()
+            if (event == Lifecycle.Event.ON_START) current?.let(graph.transport::connect)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) current?.let(graph.transport::connect)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); graph.transport.close() }
+    }
+
     fun select(tv: TvDevice) {
         current = tv
         graph.known.lastSelected = tv.id
         graph.known.remember(tv)
+        graph.transport.connect(tv)
         picker = false
     }
 
@@ -118,14 +133,11 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
     }.await() ?: throw IllegalStateException("Eşleştirme iptal edildi")
     suspend fun pairAtv(target: TvDevice): Boolean = graph.atvPairing.pair(target.host, target.port, "AfuRemote") { askForAtvCode(target) }
     suspend fun remoteKey(target: TvDevice, key: com.afudm.afuremote.protocol.RemoteKey): SendResult =
-        if (target.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.key(target, key) { pairAtv(target) }
-        else graph.controller.key(target, key, onPairing)
+        graph.transport.send(target, RemoteCommand.Key(key), { pairAtv(target) }, onPairing)
     suspend fun remoteText(target: TvDevice, value: String): SendResult =
-        if (target.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.text(target, value) { pairAtv(target) }
-        else graph.controller.text(target, value, onPairing)
+        graph.transport.send(target, RemoteCommand.Text(value), { pairAtv(target) }, onPairing)
     suspend fun remoteLaunch(target: TvDevice, app: String): SendResult =
-        if (target.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.launch(target, "market://launch?id=$app") { pairAtv(target) }
-        else graph.controller.launch(target, app, onPairing)
+        graph.transport.send(target, RemoteCommand.Launch(app), { pairAtv(target) }, onPairing)
 
     val tv = current
     Box(Modifier.fillMaxSize().background(RemoteColors.Background)) {
@@ -155,7 +167,7 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
         }
         if (settings) {
             SettingsPage(versionName, onModeChange, footer, onClose = { settings = false }) { url ->
-                send(quiet = false) { if (it.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.launch(it, url) { pairAtv(it) } else graph.controller.open(it, OpenRequest(url), onPairing) }
+                send(quiet = false) { graph.transport.send(it, RemoteCommand.Open(OpenRequest(url)), { pairAtv(it) }, onPairing) }
             }
             BackHandler { settings = false }
         }
@@ -222,7 +234,7 @@ fun PhoneHomeScreen(versionName: String, onModeChange: (String?) -> Unit, footer
         fun submit() {
             val url = LinkClassifier.extractUrl(link) ?: run { error = "Geçerli bir link yazın"; return }
             linkDialog = false
-            send(quiet = false) { if (it.backend == TvDevice.Backend.ATV_REMOTE_V2) graph.atvRemote.launch(it, url) { pairAtv(it) } else graph.controller.open(it, OpenRequest(url), onPairing) }
+            send(quiet = false) { graph.transport.send(it, RemoteCommand.Open(OpenRequest(url)), { pairAtv(it) }, onPairing) }
         }
         AlertDialog(
             onDismissRequest = { linkDialog = false },
