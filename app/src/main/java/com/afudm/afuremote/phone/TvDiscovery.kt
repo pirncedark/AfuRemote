@@ -51,7 +51,7 @@ import kotlin.coroutines.resume
  * 3) NSD birkaç saniyede sonuç vermezse telefonun alt ağı 9870 portunda taranır,
  * 4) listedeki TV'ler düzenli yoklanır; iki kez yanıt vermeyen düşürülür.
  */
-class TvDiscovery(context: Context, private val client: TvClient, private val known: KnownTvStore) {
+class TvDiscovery(context: Context, private val client: TvClient, private val known: KnownTvStore, private val transport: RemoteTransport) {
     private val app = context.applicationContext
     private val nsd = app.getSystemService(NsdManager::class.java)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -184,8 +184,7 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
                 launch {
                     // v2 cihazlar 6466'da TLS+protobuf konuşur; HTTP /v1/info yoklaması her
                     // seferinde başarısız olur ve cihaz yanlışlıkla ölü sayılırdı.
-                    val alive = if (tv.backend == TvDevice.Backend.ATV_REMOTE_V2) portOpen(tv.host, tv.port)
-                    else probe.info(tv.host, tv.port)?.id == tv.id
+                    val alive = transport.isAlive(tv)
                     if (alive) misses.remove(tv.id)
                     else if ((misses.merge(tv.id, 1) { a, b -> a + b } ?: 0) >= 2) {
                         misses.remove(tv.id)
@@ -215,9 +214,9 @@ class TvDiscovery(context: Context, private val client: TvClient, private val kn
      * Kayıtlı ya da listelenmiş cihazı geri yükler. v2 cihazlarda /v1/info yoklaması
      * kullanılamaz (6466 TLS konuşur), bu yüzden kimlik kayıttan gelir.
      */
-    private fun restore(tv: TvDevice) {
+    private suspend fun restore(tv: TvDevice) {
         if (tv.backend == TvDevice.Backend.ATV_REMOTE_V2) {
-            if (!portOpen(tv.host, tv.port)) return
+            if (!transport.isAlive(tv)) return
             misses.remove(tv.id)
             _devices.update { list -> if (list.any { it.id == tv.id }) list else list + tv }
             return
