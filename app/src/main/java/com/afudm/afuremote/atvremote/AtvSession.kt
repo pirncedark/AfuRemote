@@ -5,7 +5,6 @@ import com.afudm.afuremote.atvremote.protocol.AtvWireImeCounters
 import com.afudm.afuremote.atvremote.protocol.AtvWireProtocol
 import java.io.InputStream
 import java.io.OutputStream
-import java.net.SocketTimeoutException
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLSocket
@@ -19,8 +18,11 @@ class AtvSession(
     enum class State { STOPPED, CONNECTING, READY, RECONNECTING }
     @Volatile var state: State = State.STOPPED
         private set
-    private val queue = LinkedBlockingQueue<(AtvWireImeCounters) -> ByteArray>()
+    private data class PendingCommand(val expiresAtNanos: Long, val encode: (AtvWireImeCounters) -> ByteArray)
+    private data class Incoming(val message: RemoteProto.RemoteMessage? = null, val failure: Exception? = null)
+    private val queue = LinkedBlockingQueue<PendingCommand>()
     @Volatile private var closed = false
+    @Volatile private var liveSocket: SSLSocket? = null
     private var worker: Thread? = null
 
     @Synchronized fun start() {
@@ -32,7 +34,7 @@ class AtvSession(
         // Never report success while the handshake/reconnect loop has no ready socket.
         // Commands are not buffered across reconnects because that can replay stale input.
         if (closed || state != State.READY) return false
-        return queue.offer { counters -> message(counters).toByteArray() }
+        return queue.offer(PendingCommand(System.nanoTime() + COMMAND_MAX_AGE_NANOS) { counters -> message(counters).toByteArray() })
     }
 
     private fun runLoop() {
@@ -45,31 +47,45 @@ class AtvSession(
                 state = if (firstAttempt) State.CONNECTING else State.RECONNECTING
                 firstAttempt = false
                 val connected = tls.connect(host, port, true)
-                socket = connected.first
-                socket.soTimeout = IO_POLL_MS
-                val input = socket.inputStream
-                val output = socket.outputStream
+                val activeSocket = connected.first
+                socket = activeSocket
+                liveSocket = activeSocket
+                activeSocket.soTimeout = 0
+                val input = activeSocket.inputStream
+                val output = activeSocket.outputStream
                 var counters = handshake(input, output)
+                queue.clear()
+                val incoming = LinkedBlockingQueue<Incoming>()
                 state = State.READY
                 connectedAtNanos = System.nanoTime()
-                while (!closed && !socket.isClosed) {
-                    val command = queue.poll(IO_POLL_MS.toLong(), TimeUnit.MILLISECONDS)
-                    if (command != null) write(output, command(counters))
+                val reader = Thread({
                     try {
-                        val message = RemoteProto.RemoteMessage.parseFrom(readFrame(input))
+                        while (!closed && !activeSocket.isClosed) incoming.put(Incoming(message = RemoteProto.RemoteMessage.parseFrom(AtvWireProtocol.readFrame(input))))
+                    } catch (e: Exception) { if (!closed) incoming.offer(Incoming(failure = e)) }
+                }, "AfuRemote-ATV-read-${host.takeLast(8)}").apply { isDaemon = true; start() }
+                while (!closed && !activeSocket.isClosed) {
+                    val command = queue.poll(IO_POLL_MS, TimeUnit.MILLISECONDS)
+                    if (command != null && command.expiresAtNanos >= System.nanoTime()) write(output, command.encode(counters))
+                    val event = incoming.poll()
+                    if (event != null) {
+                        event.failure?.let { throw it }
+                        val message = event.message ?: continue
                         if (message.hasRemotePingRequest()) write(output, RemoteProto.RemoteMessage.newBuilder().setRemotePingResponse(
                             RemoteProto.RemotePingResponse.newBuilder().setVal1(message.remotePingRequest.val1)).build().toByteArray())
                         if (message.hasRemoteImeBatchEdit()) counters = AtvWireImeCounters(message.remoteImeBatchEdit.imeCounter, message.remoteImeBatchEdit.fieldCounter)
                         if (message.hasRemoteError()) error("TV kumanda oturumunu kapattı")
-                    } catch (_: SocketTimeoutException) { /* poll again, leaving the persistent socket open */ }
+                    }
                 }
+                reader.interrupt()
             } catch (_: InterruptedException) {
                 if (closed) break
             } catch (_: Exception) {
                 if (closed) break
             } finally {
                 state = if (closed) State.STOPPED else State.RECONNECTING
+                queue.clear()
                 runCatching { socket?.close() }
+                if (liveSocket === socket) liveSocket = null
             }
             if (!closed) {
                 if (connectedAtNanos != null && System.nanoTime() - connectedAtNanos >= STABLE_SESSION_NANOS) retryMs = 500L
@@ -84,7 +100,7 @@ class AtvSession(
         var counters = AtvWireImeCounters()
         var active = CAPABILITIES
         repeat(HANDSHAKE_FRAMES) {
-            val message = RemoteProto.RemoteMessage.parseFrom(readFrame(input))
+            val message = RemoteProto.RemoteMessage.parseFrom(AtvWireProtocol.readFrame(input))
             when {
                 message.hasRemotePingRequest() -> write(output, RemoteProto.RemoteMessage.newBuilder().setRemotePingResponse(
                     RemoteProto.RemotePingResponse.newBuilder().setVal1(message.remotePingRequest.val1)).build().toByteArray())
@@ -106,41 +122,19 @@ class AtvSession(
 
     private fun write(output: OutputStream, bytes: ByteArray) { output.write(AtvWireProtocol.encodeFrame(bytes)); output.flush() }
 
-    private fun readFrame(input: InputStream): ByteArray {
-        var length = 0
-        var shift = 0
-        var count = 0
-        while (count < 5) {
-            val value = input.read()
-            check(value >= 0) { "TV bağlantısı kapandı" }
-            if (shift == 28) require((value and 0xf0) == 0) { "TV geçersiz çerçeve uzunluğu gönderdi" }
-            length = length or ((value and 0x7f) shl shift)
-            count++
-            if (value and 0x80 == 0) break
-            shift += 7
-        }
-        require(count <= 5 && length in 1..AtvWireProtocol.MAX_FRAME_SIZE) { "TV geçersiz çerçeve uzunluğu gönderdi" }
-        return ByteArray(length).also { bytes ->
-            var offset = 0
-            while (offset < length) {
-                val n = input.read(bytes, offset, length - offset)
-                check(n > 0) { "TV eksik veri gönderdi" }
-                offset += n
-            }
-        }
-    }
-
     @Synchronized override fun close() {
         if (closed) return
         closed = true
         state = State.STOPPED
+        runCatching { liveSocket?.close() }
         worker?.interrupt()
         worker = null
         queue.clear()
     }
 
     private companion object {
-        const val IO_POLL_MS = 500
+        const val IO_POLL_MS = 20L
+        const val COMMAND_MAX_AGE_NANOS = 2_000_000_000L
         const val MAX_RETRY_MS = 30_000L
         const val STABLE_SESSION_NANOS = 10_000_000_000L
         const val HANDSHAKE_FRAMES = 16

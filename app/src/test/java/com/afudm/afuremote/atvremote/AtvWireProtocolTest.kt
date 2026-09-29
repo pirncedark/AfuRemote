@@ -2,10 +2,23 @@ package com.afudm.afuremote.atvremote
 
 import com.afudm.afuremote.atvremote.protocol.AtvWireImeCounters
 import com.afudm.afuremote.atvremote.protocol.AtvWireProtocol
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import org.junit.Assert.*
 import org.junit.Test
 
 class AtvWireProtocolTest {
+    @Test fun `blocking frame reader assembles prefix and payload across short reads`() {
+        val expected = byteArrayOf(1, 2, 3, 4)
+        val framed = AtvWireProtocol.encodeFrame(expected)
+        val fragmented = object : InputStream() {
+            private val source = ByteArrayInputStream(framed)
+            override fun read(): Int = source.read()
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int = source.read(buffer, offset, minOf(1, length))
+        }
+        assertArrayEquals(expected, AtvWireProtocol.readFrame(fragmented))
+    }
+
     @Test fun `varint boundaries encode and decode`() {
         listOf(0, 127, 128, 16383, 16384).forEach { value ->
             val encoded = AtvWireProtocol.encodeVarint(value)

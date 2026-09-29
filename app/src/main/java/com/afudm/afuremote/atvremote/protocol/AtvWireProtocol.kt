@@ -3,6 +3,7 @@ package com.afudm.afuremote.atvremote.protocol
 import com.afudm.afuremote.atvremote.proto.RemoteProto
 import com.google.polo.wire.protobuf.PoloProto
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.security.MessageDigest
 
 /** Pure JVM implementation of the length-delimited protobuf wire format and ATV messages. */
@@ -20,6 +21,31 @@ object AtvWireProtocol {
         require(size <= MAX_FRAME_SIZE) { "Protobuf message is too large" }
         require(size == frame.size - offset) { "Invalid protobuf frame length: expected $size bytes" }
         return frame.copyOfRange(offset, frame.size)
+    }
+
+    /** Reads one complete frame from a blocking stream without discarding partial reads. */
+    fun readFrame(input: InputStream): ByteArray {
+        var length = 0
+        var shift = 0
+        var count = 0
+        while (count < 5) {
+            val value = input.read()
+            check(value >= 0) { "TV connection closed" }
+            if (shift == 28) require((value and 0xf0) == 0) { "Invalid frame length" }
+            length = length or ((value and 0x7f) shl shift)
+            count++
+            if (value and 0x80 == 0) break
+            shift += 7
+        }
+        require(count <= 5 && length in 1..MAX_FRAME_SIZE) { "Invalid frame length" }
+        val payload = ByteArray(length)
+        var offset = 0
+        while (offset < length) {
+            val read = input.read(payload, offset, length - offset)
+            check(read > 0) { "Incomplete frame" }
+            offset += read
+        }
+        return payload
     }
 
     fun encodeVarint(value: Int): ByteArray {

@@ -6,7 +6,9 @@ import com.afudm.afuremote.phone.SendResult
 import com.afudm.afuremote.phone.TvDevice
 import com.afudm.afuremote.protocol.RemoteKey
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Manages one selected TV's persistent connection; no socket work runs on the UI thread. */
 class AtvRemoteClient(private val credentials: AtvCredentialStore, private val tls: AtvTlsClientFactory, private val clientName: String) : AutoCloseable {
@@ -40,7 +42,13 @@ class AtvRemoteClient(private val credentials: AtvCredentialStore, private val t
             if (credentials.fingerprint(tv.host) == null && !pair()) return@withContext SendResult.Failed("TV ekranındaki 6 haneli kodla eşleştirme tamamlanmadı")
             synchronized(this@AtvRemoteClient) { connect(tv) }
             val active = session ?: return@withContext SendResult.Failed("Android TV bağlantısı kurulamadı")
-            if (!active.send(command)) SendResult.Failed("Android TV bağlantısı kapandı; yeniden deneyin") else SendResult.Ok
+            val sent = withTimeoutOrNull<Boolean>(5_000) {
+                while (active.state != AtvSession.State.READY || !active.send(command)) {
+                    delay(25)
+                }
+                true
+            } ?: false
+            if (sent) SendResult.Ok else SendResult.Failed("Android TV bağlantısı kurulamadı; yeniden deneyin")
         } catch (e: Exception) {
             SendResult.Failed(e.message ?: "Android TV Remote v2 bağlantısı kurulamadı")
         }
