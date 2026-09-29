@@ -49,6 +49,13 @@ The APK is produced under `app/build/outputs/apk/debug/`.
 
 License: not specified yet
 
+
+## Afu family
+
+- [AfuDM](https://github.com/pirncedark/AfuDM) — download manager (Windows)
+- [AfuDesk](https://github.com/pirncedark/afudesk) — serverless remote desktop: connect with one code (Windows)
+- [AfuTube](https://github.com/pirncedark/AfuDM/releases?q=afutube) — video downloader (Android)
+
 ---
 
 ## Türkçe
@@ -99,3 +106,9 @@ gradle wrapper --gradle-version 9.6.0 --distribution-type bin
 APK, `app/build/outputs/apk/debug/` klasörüne oluşturulur.
 
 Lisans: henüz belirtilmedi
+
+## Afu ailesi
+
+- [AfuDM](https://github.com/pirncedark/AfuDM) — indirme yöneticisi (Windows)
+- [AfuDesk](https://github.com/pirncedark/afudesk) — sunucusuz uzak masaüstü: tek kodla bağlan (Windows)
+- [AfuTube](https://github.com/pirncedark/AfuDM/releases?q=afutube) — video indirici (Android)
