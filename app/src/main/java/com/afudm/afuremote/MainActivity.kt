@@ -3,7 +3,6 @@ package com.afudm.afuremote
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,8 +28,7 @@ import com.afudm.afuremote.update.UpdateState
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Koyu zemin: durum/gezinme çubuğu simgeleri açık renk kalsın.
-        enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
+        enableEdgeToEdge()
         applyModeExtra(intent)
         setContent {
             AfuTheme {

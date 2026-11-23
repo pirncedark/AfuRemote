@@ -1,7 +1,6 @@
 package com.afudm.afuremote.phone
 
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -17,6 +16,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.border
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -55,7 +57,7 @@ fun DiscoveryScreen(
     onAddIp: () -> Unit,
     onClose: () -> Unit
 ) {
-    Box(Modifier.fillMaxSize().background(Color(0xFF232323))) {
+    Box(Modifier.fillMaxSize().background(RemoteColors.Background)) {
         GlowBackground()
         Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 28.dp).verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -82,12 +84,12 @@ fun DiscoveryScreen(
                 )
                 Text(
                     "Android TV Remote hizmeti olan TV'ler ve projeksiyonlar da burada görünür.",
-                    color = RemoteColors.Muted.copy(alpha = .7f), fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)
+                    color = RemoteColors.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)
                 )
             }
 
             Row(
-                Modifier.padding(top = 24.dp).clip(RoundedCornerShape(24.dp)).background(Color.White.copy(alpha = .08f))
+                Modifier.padding(top = 24.dp).heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)).background(RemoteColors.Button)
                     .clickable(enabled = !scanning, onClick = onRefresh).padding(horizontal = 18.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -105,7 +107,8 @@ fun DiscoveryScreen(
 private fun DeviceRow(tv: TvDevice, selected: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = if (selected) .14f else .07f))
+            .background(if (selected) RemoteColors.ButtonPressed else RemoteColors.Button)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -130,19 +133,12 @@ fun RoundTap(glyph: Glyph, description: String, onClick: () -> Unit, tint: Color
 /** Arkadaki yumuşak renk lekeleri (bulanıklık radyal geçişle yapılır; her Android sürümünde çalışır). */
 @Composable
 private fun GlowBackground() {
-    val t by rememberInfiniteTransition(label = "glow").animateFloat(
-        0f, 1f, infiniteRepeatable(tween(9_000, easing = LinearEasing), RepeatMode.Reverse), label = "glowT"
-    )
     Canvas(Modifier.fillMaxSize()) {
-        fun blob(color: Color, x: Float, y: Float, r: Float) =
-            drawCircle(Brush.radialGradient(listOf(color, Color.Transparent), center = Offset(x, y), radius = r), radius = r, center = Offset(x, y))
-        val w = size.width
-        blob(Color(0x55777766), w * (.3f + .05f * t), w * .15f, w * .45f)
-        blob(Color(0x33505A80), w * (.8f - .05f * t), w * .12f, w * .4f)
-        blob(Color(0x66A01C1C), w * (.35f + .04f * t), w * .58f, w * .38f)
-        blob(Color(0x55285AA0), w * (.66f - .04f * t), w * .55f, w * .36f)
-        blob(Color(0x331E7878), w * .95f, w * (.62f + .03f * t), w * .3f)
-        blob(Color(0x22FFFFFF), w * .3f, size.height * .82f, w * .25f)
+        val center = Offset(size.width * .5f, size.height * .75f)
+        drawCircle(
+            Brush.radialGradient(listOf(RemoteColors.RingStart.copy(alpha = .14f), Color.Transparent), center, size.width),
+            radius = size.width, center = center
+        )
     }
 }
 
@@ -154,7 +150,7 @@ private fun PulseDots() {
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
         repeat(3) { i ->
             val active = t.toInt() == i
-            Box(Modifier.size(if (active) 12.dp else 4.dp).clip(CircleShape).background(Color.White.copy(alpha = if (active) .75f else .45f)))
+            Box(Modifier.size(if (active) 12.dp else 4.dp).clip(CircleShape).background(RemoteColors.Muted.copy(alpha = if (active) 1f else .6f)))
         }
     }
 }

@@ -22,10 +22,11 @@ enum class Glyph { UP, DOWN, LEFT, RIGHT, PLUS, MINUS, POWER, HOME, BACK, KEYBOA
 
 @Composable
 fun GlyphIcon(glyph: Glyph, modifier: Modifier = Modifier, size: Dp = 24.dp, color: Color = RemoteColors.Icon) {
-    Canvas(modifier.size(size)) { draw(glyph, color) }
+    val background = RemoteColors.Background
+    Canvas(modifier.size(size)) { draw(glyph, color, background) }
 }
 
-private fun DrawScope.draw(glyph: Glyph, color: Color) {
+private fun DrawScope.draw(glyph: Glyph, color: Color, background: Color) {
     val w = size.width
     val s = Stroke(width = w * 0.09f, cap = StrokeCap.Round, join = StrokeJoin.Round)
     fun p(vararg pts: Float) = Path().apply { moveTo(pts[0] * w, pts[1] * w); for (i in 2 until pts.size step 2) lineTo(pts[i] * w, pts[i + 1] * w) }
@@ -53,7 +54,7 @@ private fun DrawScope.draw(glyph: Glyph, color: Color) {
         }
         Glyph.KEYBOARD -> {
             drawRoundRect(color, topLeft = Offset(w * .08f, w * .25f), size = Size(w * .84f, w * .5f), cornerRadius = CornerRadius(w * .08f))
-            val key = Color(0xFF3A3A3A)
+            val key = background
             for (row in 0..1) for (col in 0..5) drawRect(key, Offset(w * (.16f + col * .115f), w * (.33f + row * .12f)), Size(w * .07f, w * .07f))
             drawRect(key, Offset(w * .3f, w * .6f), Size(w * .4f, w * .06f))
         }
@@ -79,7 +80,7 @@ private fun DrawScope.draw(glyph: Glyph, color: Color) {
                 drawRoundRect(color, topLeft = Offset(w * .42f, w * .04f), size = Size(w * .16f, w * .2f), cornerRadius = CornerRadius(w * .03f))
             }
             drawCircle(color, radius = w * .32f)
-            drawCircle(RemoteColors.Background, radius = w * .13f)
+            drawCircle(background, radius = w * .13f)
         }
         Glyph.LINK -> rotate(-45f) {
             drawRoundRect(color, topLeft = Offset(w * .08f, w * .36f), size = Size(w * .46f, w * .28f), cornerRadius = CornerRadius(w * .14f), style = s)
